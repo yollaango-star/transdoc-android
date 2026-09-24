@@ -1,34 +1,521 @@
-name: Android CI/CD
+# TransDoc — compilation automatique de l'APK Android.
+# Ce fichier génère le projet Android à partir de transdoc.html et des demo-*.json du dépôt,
+# puis compile TransDoc.apk (onglet Actions → dernière exécution → Artifacts → TransDoc-apk).
+name: Construire l'APK TransDoc
 
 on:
   push:
-    branches: [ "main" ] # Déclenche la génération lors d'un push sur la branche main
-  pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  apk:
+    runs-on: ubuntu-24.04
+    env:
+      KEYSTORE_B64: ${{ secrets.TRANSDOC_KEYSTORE_BASE64 }}
     steps:
-    - name: Checkout le code source
-      uses: actions/checkout@v4
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v5
 
-    - name: Configurer JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: gradle
+      - name: Installer Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
 
-    - name: Rendre le script Gradle exécutable
-      run: chmod +x ./gradlew
+      - name: Installer le SDK Android
+        uses: android-actions/setup-android@v3
 
-    - name: Compiler l'APK (Assemble Release)
-      run: ./gradlew assembleRelease # Utilisez assembleDebug si vous n'avez pas encore configuré vos clés de signature
+      - name: Installer Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
-    - name: Téléverser l'APK généré
-      uses: actions/upload-artifact@v4
-      with:
-        name: MonApplication-APK
-        path: app/build/outputs/apk/release/app-release.apk # Ajustez le chemin selon votre configuration (ex: .../debug/app-debug.apk)
+      - name: Générer le projet Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf android
+          mkdir -p android
+          cat > "android/settings.gradle" <<'FIN_FICHIER'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "TransDoc"
+          include ':app'
+          FIN_FICHIER
+          cat > "android/build.gradle" <<'FIN_FICHIER'
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          FIN_FICHIER
+          cat > "android/gradle.properties" <<'FIN_FICHIER'
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+          FIN_FICHIER
+          mkdir -p "android/app"
+          cat > "android/app/build.gradle" <<'FIN_FICHIER'
+          plugins {
+              id 'com.android.application'
+          }
+
+          // Signature : si les variables TRANSDOC_KEYSTORE* sont fournies (secrets GitHub), l'APK est signé
+          // avec la clé officielle TransDoc ; sinon avec une clé de test (installable, mais sans mise à jour possible).
+          def keystore = System.getenv('TRANSDOC_KEYSTORE')
+
+          android {
+              namespace 'ga.transdoc.app'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId 'ga.transdoc.app'
+                  minSdk 26          // Android 8.0 et plus
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0.0'
+              }
+
+              signingConfigs {
+                  officielle {
+                      if (keystore) {
+                          storeFile file(keystore)
+                          storePassword System.getenv('TRANSDOC_KEYSTORE_PASSWORD')
+                          keyAlias System.getenv('TRANSDOC_KEY_ALIAS')
+                          keyPassword System.getenv('TRANSDOC_KEY_PASSWORD')
+                      }
+                  }
+              }
+
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      signingConfig keystore ? signingConfigs.officielle : signingConfigs.debug
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.webkit:webkit:1.11.0'
+          }
+          FIN_FICHIER
+          mkdir -p "android/app/src/main"
+          cat > "android/app/src/main/AndroidManifest.xml" <<'FIN_FICHIER'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+              <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher_round"
+                  android:label="@string/app_name"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.TransDoc">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+                      android:windowSoftInputMode="adjustResize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          FIN_FICHIER
+          mkdir -p "android/app/src/main/java/ga/transdoc/app"
+          cat > "android/app/src/main/java/ga/transdoc/app/MainActivity.java" <<'FIN_FICHIER'
+          package ga.transdoc.app;
+
+          import android.Manifest;
+          import android.app.Activity;
+          import android.content.ActivityNotFoundException;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.webkit.PermissionRequest;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebResourceResponse;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          import androidx.webkit.WebViewAssetLoader;
+
+          /**
+           * TransDoc Android : affiche l'application web embarquée (assets/index.html).
+           * L'application est servie depuis https://appassets.androidplatform.net pour être un
+           * « contexte sécurisé » : c'est ce qui autorise l'accès à la caméra pour le scanner QR.
+           */
+          public class MainActivity extends Activity {
+
+              private static final String HOTE = "appassets.androidplatform.net";
+              private static final String ACCUEIL = "https://" + HOTE + "/assets/index.html";
+              private static final int REQ_CAMERA = 1;
+              private static final int REQ_PHOTO = 2;
+
+              private WebView web;
+              private PermissionRequest demandeCamera;
+              private ValueCallback<Uri[]> retourPhoto;
+
+              @Override
+              protected void onCreate(Bundle etat) {
+                  super.onCreate(etat);
+                  web = new WebView(this);
+                  setContentView(web);
+
+                  WebSettings s = web.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);           // données des véhicules (localStorage)
+                  s.setMediaPlaybackRequiresUserGesture(false);
+                  s.setAllowFileAccess(false);
+                  s.setAllowContentAccess(false);
+
+                  final WebViewAssetLoader chargeur = new WebViewAssetLoader.Builder()
+                          .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                          .build();
+
+                  web.setWebViewClient(new WebViewClient() {
+                      @Override
+                      public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
+                          return chargeur.shouldInterceptRequest(r.getUrl());
+                      }
+
+                      @Override
+                      public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
+                          Uri u = r.getUrl();
+                          if (HOTE.equals(u.getHost())) return false;
+                          // Liens externes : ouverts dans le navigateur du téléphone
+                          try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (ActivityNotFoundException ignore) { }
+                          return true;
+                      }
+                  });
+
+                  web.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onPermissionRequest(final PermissionRequest demande) {
+                          runOnUiThread(() -> {
+                              boolean video = false;
+                              for (String res : demande.getResources()) {
+                                  if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(res)) video = true;
+                              }
+                              if (!video) { demande.deny(); return; }
+                              if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                                  demande.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                              } else {
+                                  demandeCamera = demande;
+                                  requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+                              }
+                          });
+                      }
+
+                      @Override
+                      public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> retour, FileChooserParams params) {
+                          if (retourPhoto != null) retourPhoto.onReceiveValue(null);
+                          retourPhoto = retour;
+                          Intent choix = new Intent(Intent.ACTION_GET_CONTENT);
+                          choix.addCategory(Intent.CATEGORY_OPENABLE);
+                          choix.setType("image/*");
+                          try {
+                              startActivityForResult(Intent.createChooser(choix, getString(R.string.choisir_photo)), REQ_PHOTO);
+                          } catch (ActivityNotFoundException e) {
+                              retourPhoto = null;
+                              return false;
+                          }
+                          return true;
+                      }
+                  });
+
+                  if (etat != null) web.restoreState(etat);
+                  else web.loadUrl(ACCUEIL);
+              }
+
+              @Override
+              public void onRequestPermissionsResult(int code, String[] permissions, int[] resultats) {
+                  super.onRequestPermissionsResult(code, permissions, resultats);
+                  if (code == REQ_CAMERA && demandeCamera != null) {
+                      if (resultats.length > 0 && resultats[0] == PackageManager.PERMISSION_GRANTED) {
+                          demandeCamera.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                      } else {
+                          demandeCamera.deny(); // l'application propose alors d'importer une photo
+                      }
+                      demandeCamera = null;
+                  }
+              }
+
+              @Override
+              @SuppressWarnings("deprecation")
+              protected void onActivityResult(int code, int resultat, Intent donnees) {
+                  super.onActivityResult(code, resultat, donnees);
+                  if (code == REQ_PHOTO && retourPhoto != null) {
+                      Uri[] photo = (resultat == RESULT_OK && donnees != null && donnees.getData() != null)
+                              ? new Uri[]{donnees.getData()} : null;
+                      retourPhoto.onReceiveValue(photo);
+                      retourPhoto = null;
+                  }
+              }
+
+              /** Retour : ferme d'abord la fenêtre ouverte dans l'application, sinon quitte. */
+              @Override
+              @SuppressWarnings("deprecation")
+              public void onBackPressed() {
+                  web.evaluateJavascript(
+                          "(function(){var d=document.querySelector('dialog[open]');if(d){d.close();return true}return false})()",
+                          valeur -> { if (!"true".equals(valeur)) MainActivity.super.onBackPressed(); });
+              }
+
+              @Override
+              protected void onSaveInstanceState(Bundle etat) {
+                  super.onSaveInstanceState(etat);
+                  web.saveState(etat);
+              }
+
+              @Override
+              protected void onDestroy() {
+                  if (web != null) web.destroy();
+                  super.onDestroy();
+              }
+          }
+          FIN_FICHIER
+          mkdir -p "android/app/src/main/res/values"
+          cat > "android/app/src/main/res/values/strings.xml" <<'FIN_FICHIER'
+          <resources>
+              <string name="app_name">TransDoc</string>
+              <string name="choisir_photo">Photo du code QR</string>
+          </resources>
+          FIN_FICHIER
+          mkdir -p "android/app/src/main/res/values"
+          cat > "android/app/src/main/res/values/colors.xml" <<'FIN_FICHIER'
+          <resources>
+              <color name="foret">#0E5A3A</color>
+              <color name="soleil">#F2C230</color>
+              <color name="fond">#F3F6F1</color>
+          </resources>
+          FIN_FICHIER
+          mkdir -p "android/app/src/main/res/values"
+          cat > "android/app/src/main/res/values/themes.xml" <<'FIN_FICHIER'
+          <resources>
+              <style name="Theme.TransDoc" parent="android:Theme.Material.Light.NoActionBar">
+                  <item name="android:statusBarColor">@color/foret</item>
+                  <item name="android:navigationBarColor">@color/foret</item>
+                  <item name="android:windowBackground">@color/fond</item>
+                  <item name="android:colorPrimary">@color/foret</item>
+                  <item name="android:colorAccent">@color/soleil</item>
+              </style>
+          </resources>
+          FIN_FICHIER
+          mkdir -p "android/app/src/main/res/drawable"
+          cat > "android/app/src/main/res/drawable/ic_launcher_foreground.xml" <<'FIN_FICHIER'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <!-- Pastille jaune -->
+              <path android:fillColor="#F2C230"
+                  android:pathData="M40,30h28a10,10 0,0 1,10 10v28a10,10 0,0 1,-10 10h-28a10,10 0,0 1,-10 -10v-28a10,10 0,0 1,10 -10z" />
+              <!-- Lettre T -->
+              <path android:fillColor="#13201A" android:pathData="M41,41h26v7h-9.5v20h-7v-20h-9.5z" />
+              <!-- Bande vert-jaune-bleu, sous la pastille -->
+              <path android:fillColor="#1E8C4E" android:pathData="M36,81h12v2.5h-12z" />
+              <path android:fillColor="#F2C230" android:pathData="M48,81h12v2.5h-12z" />
+              <path android:fillColor="#2260AE" android:pathData="M60,81h12v2.5h-12z" />
+          </vector>
+          FIN_FICHIER
+          mkdir -p "android/app/src/main/res/mipmap-anydpi-v26"
+          cat > "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" <<'FIN_FICHIER'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/foret" />
+              <foreground android:drawable="@drawable/ic_launcher_foreground" />
+          </adaptive-icon>
+          FIN_FICHIER
+          mkdir -p "android/app/src/main/res/mipmap-anydpi-v26"
+          cat > "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" <<'FIN_FICHIER'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/foret" />
+              <foreground android:drawable="@drawable/ic_launcher_foreground" />
+          </adaptive-icon>
+          FIN_FICHIER
+          mkdir -p "android/outils"
+          cat > "android/outils/adaptateur.js" <<'FIN_FICHIER'
+          window.TRANSDOC_AUTONOME = true;
+          (function () {
+            var CLE = 'transdoc.autonome.db';
+            var store = {};
+            try { store = JSON.parse(localStorage.getItem(CLE)) || {}; } catch (e) { store = {}; }
+            function sauver() { try { localStorage.setItem(CLE, JSON.stringify(store)); } catch (e) { console.error(e); } }
+            var abonnes = [];
+            function prevenir() { abonnes.slice().forEach(function (f) { try { f(); } catch (e) { console.error(e); } }); }
+            function abonner(f) { abonnes.push(f); setTimeout(f); return function () { var i = abonnes.indexOf(f); if (i >= 0) abonnes.splice(i, 1); }; }
+            function copie(d) { return JSON.parse(JSON.stringify(d)); }
+            function instantane(p) { return { id: p.split('/').pop(), exists: p in store, data: function () { return store[p]; }, metadata: { fromCache: false, hasPendingWrites: false } }; }
+            function ecrit() { sauver(); setTimeout(prevenir); }
+
+            function doc(p) {
+              return {
+                path: p, id: p.split('/').pop(),
+                get: function () { return Promise.resolve(instantane(p)); },
+                set: function (d) { store[p] = copie(d); ecrit(); return Promise.resolve(); },
+                update: function (d) {
+                  if (!(p in store)) return Promise.reject({ code: 'invalid_argument', message: 'Document absent' });
+                  Object.assign(store[p], copie(d)); ecrit(); return Promise.resolve();
+                },
+                delete: function () { delete store[p]; ecrit(); return Promise.resolve(); },
+                onSnapshot: function (suivant) { return abonner(function () { suivant(instantane(p)); }); }
+              };
+            }
+            function collection(c) {
+              var prof = c.split('/').length + 1;
+              return {
+                path: c,
+                doc: function (id) { return doc(c + '/' + id); },
+                onSnapshot: function (suivant) {
+                  return abonner(function () {
+                    var docs = Object.keys(store).filter(function (k) { return k.indexOf(c + '/') === 0 && k.split('/').length === prof; }).sort().map(instantane);
+                    suivant({ docs: docs, size: docs.length, empty: !docs.length, metadata: {} });
+                  });
+                }
+              };
+            }
+
+            // Données de démonstration au premier lancement, dates recalées sur aujourd'hui
+            var DEMO = window.TRANSDOC_DEMO || {};
+            if (!store['config/installation']) {
+              var decal = Math.round((new Date(new Date().toDateString()) - new Date(2026, 8, 24)) / 864e5);
+              var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+              var recaler = function (d) { var x = new Date(d + 'T00:00'); x.setDate(x.getDate() + decal); return x.getFullYear() + '-' + pad(x.getMonth() + 1) + '-' + pad(x.getDate()); };
+              Object.keys(DEMO).forEach(function (id) {
+                var d = copie(DEMO[id]);
+                Object.keys(d.vehicules).forEach(function (k) { ['assurance', 'visite', 'vignette'].forEach(function (p) { d.vehicules[k][p] = recaler(d.vehicules[k][p]); }); });
+                store['registre/' + id] = d;
+              });
+              store['config/installation'] = { le: Date.now(), version: 1 };
+              sauver();
+            }
+
+            var utilisateur = {
+              id: function () { return Promise.resolve('telephone'); },
+              isOwner: function () { return Promise.resolve(true); },
+              canEdit: function () { return Promise.resolve(true); },
+              can: function () { return Promise.resolve(true); },
+              profiles: function () { return Promise.resolve({}); },
+              search: function () { return Promise.resolve([]); }
+            };
+            var db = { doc: doc, collection: collection };
+            window.claude = { use: function (n) { return Promise.resolve(n === 'db' ? db : n === 'user' ? utilisateur : null); } };
+
+            // Ajustements d'interface propres au mode autonome
+            document.addEventListener('DOMContentLoaded', function () {
+              var st = document.createElement('style');
+              st.textContent = '[data-tab="agents"]{display:none!important}#roleBadge{display:none!important}';
+              document.head.appendChild(st);
+              var lede = document.querySelector('#vehicules .lede');
+              if (lede) lede.textContent = "Enregistrez vos véhicules et leurs pièces. Présentez le code QR lors d'un contrôle au lieu des papiers.";
+              var ctl = document.querySelector('#controle .lede');
+              if (ctl) ctl.textContent = "Scannez le code QR ou saisissez l'immatriculation. En mode autonome, la recherche porte sur les véhicules enregistrés sur ce téléphone.";
+              var pied = document.querySelector('footer .wrap');
+              if (pied) pied.textContent = 'TransDoc Gabon · application Android · mode autonome : les données restent sur ce téléphone.';
+              var panel = document.querySelector('#apropos .panel');
+              if (panel) {
+                var p = document.createElement('p');
+                p.className = 'note';
+                p.textContent = "Cette version Android fonctionne sans connexion : les véhicules, contrôles et paiements (simulés) sont enregistrés sur ce téléphone. Le raccordement au serveur national TransDoc permettra aux agents de vérifier tous les véhicules du pays.";
+                var b = document.createElement('button');
+                b.className = 'btn ghost'; b.style.marginTop = '12px';
+                b.textContent = 'Retirer les véhicules de démonstration';
+                b.onclick = function () {
+                  if (!confirm('Retirer les véhicules de démonstration ? Vos propres véhicules sont conservés.')) return;
+                  Object.keys(store).forEach(function (k) { if (k.indexOf('registre/demo-') === 0) delete store[k]; });
+                  ecrit();
+                  b.disabled = true; b.textContent = 'Véhicules de démonstration retirés';
+                };
+                panel.appendChild(p); panel.appendChild(b);
+              }
+            });
+          })();
+          FIN_FICHIER
+          mkdir -p "android/outils"
+          cat > "android/outils/construire_index.py" <<'FIN_FICHIER'
+          import glob, json, os, re, sys
+          racine = os.environ["GITHUB_WORKSPACE"]
+          src = None
+          for nom in ("transdoc.html", "index.html"):
+              for p in glob.glob(os.path.join(racine, "**", nom), recursive=True):
+                  if "/android/" not in p:
+                      src = p; break
+              if src: break
+          if not src:
+              sys.exit("transdoc.html introuvable dans le dépôt : ajoutez-le à la racine.")
+          h = open(src, encoding="utf-8").read()
+          h = re.sub(r'<script src="[^"]*qrcode[^"]*"></script>', '<script src="lib/qrcode.min.js"></script>', h)
+          h = re.sub(r'<script src="[^"]*jsqr[^"]*"></script>', '<script src="lib/jsQR.js"></script>', h, flags=re.I)
+          demo = {}
+          for p in sorted(glob.glob(os.path.join(racine, "**", "demo-*.json"), recursive=True)):
+              if "/android/" in p: continue
+              demo[os.path.basename(p)[:-5]] = json.load(open(p, encoding="utf-8"))
+          adapt = open(os.path.join(racine, "android/outils/adaptateur.js"), encoding="utf-8").read()
+          m = re.search(r"<script>\s*\(function\(\)\{", h)
+          if not m or "TRANSDOC_AUTONOME" in h:
+              sys.exit("Format de transdoc.html inattendu : utilisez le fichier transdoc.html fourni par Claude.")
+          inj = "<script>window.TRANSDOC_DEMO=" + json.dumps(demo, ensure_ascii=False, separators=(",", ":")) + ";</script>\n<script>\n" + adapt + "</script>\n"
+          h = h[:m.start()] + inj + h[m.start():]
+          os.makedirs(os.path.join(racine, "android/app/src/main/assets/lib"), exist_ok=True)
+          open(os.path.join(racine, "android/app/src/main/assets/index.html"), "w", encoding="utf-8").write(h)
+          print("index.html généré depuis", os.path.relpath(src, racine), "avec", sum(len(d["vehicules"]) for d in demo.values()), "véhicules de démonstration")
+          FIN_FICHIER
+          python3 android/outils/construire_index.py
+
+      - name: Télécharger les bibliothèques QR (utilisables hors ligne)
+        run: |
+          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js -o android/app/src/main/assets/lib/qrcode.min.js
+          curl -fsSL https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js -o android/app/src/main/assets/lib/jsQR.js
+
+      - name: Préparer la clé de signature officielle (facultatif)
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/transdoc.jks"
+          echo "TRANSDOC_KEYSTORE=$RUNNER_TEMP/transdoc.jks" >> "$GITHUB_ENV"
+
+      - name: Compiler l'APK
+        env:
+          TRANSDOC_KEYSTORE_PASSWORD: ${{ secrets.TRANSDOC_KEYSTORE_PASSWORD }}
+          TRANSDOC_KEY_ALIAS: ${{ secrets.TRANSDOC_KEY_ALIAS }}
+          TRANSDOC_KEY_PASSWORD: ${{ secrets.TRANSDOC_KEY_PASSWORD }}
+        run: |
+          gradle -p android :app:assembleRelease --no-daemon --stacktrace
+          cp android/app/build/outputs/apk/release/app-release.apk TransDoc.apk
+
+      - name: Mettre l'APK à disposition
+        uses: actions/upload-artifact@v4
+        with:
+          name: TransDoc-apk
+          path: TransDoc.apk
+
+      - name: Publier une version téléchargeable (tags v1.0.0, v1.1.0…)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: TransDoc.apk
