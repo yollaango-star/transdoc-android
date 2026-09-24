@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TransDoc Gabon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+:root{
+  --foret:#0E5A3A; --foret-2:#0A4630; --soleil:#F2C230; --ocean:#1F5FA8;
+  --fond:#F3F6F1; --surface:#FFFFFF; --encre:#13201A; --doux:#5A6B61; --trait:#D9E2DA;
+  --ok:#1C7A4A; --ok-bg:#E3F3E9; --warn:#9A6A00; --warn-bg:#FDF1CF; --ko:#B3372B; --ko-bg:#FBE4E1;
+  --plaque:#FFFFFF; --plaque-trait:#13201A;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --foret:#3FAE78; --foret-2:#2E8C5F; --soleil:#F5CE4F; --ocean:#6FA3E6;
+  --fond:#0F1713; --surface:#18231D; --encre:#E7EFE9; --doux:#9DB0A5; --trait:#2A3A31;
+  --ok:#6FD39C; --ok-bg:#16301F; --warn:#F2C45A; --warn-bg:#352A0E; --ko:#F08A7E; --ko-bg:#3A1A16;
+  --plaque:#EEF2EE; --plaque-trait:#0F1713; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --foret:#3FAE78; --foret-2:#2E8C5F; --soleil:#F5CE4F; --ocean:#6FA3E6;
+  --fond:#0F1713; --surface:#18231D; --encre:#E7EFE9; --doux:#9DB0A5; --trait:#2A3A31;
+  --ok:#6FD39C; --ok-bg:#16301F; --warn:#F2C45A; --warn-bg:#352A0E; --ko:#F08A7E; --ko-bg:#3A1A16;
+  --plaque:#EEF2EE; --plaque-trait:#0F1713; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--fond);color:var(--encre);font:16px/1.55 "Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2,h3{font-family:"Bricolage Grotesque","Public Sans",system-ui,sans-serif;line-height:1.15;margin:0}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--soleil);outline-offset:2px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+
+/* En-tête : bande tricolore discrète */
+header{background:var(--foret);color:#fff;position:relative}
+header::after{content:"";display:block;height:6px;background:linear-gradient(90deg,#1E8C4E 0 33.3%,#F2C230 33.3% 66.6%,#2260AE 66.6%)}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:40px;height:40px;border-radius:10px;background:var(--soleil);color:#13201A;display:grid;place-items:center;font:800 20px "Bricolage Grotesque",sans-serif}
+.logo h1{font-size:1.45rem;font-weight:800;color:#fff}
+.logo small{display:block;font-size:.8rem;opacity:.8}
+.theme-btn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+
+nav{display:flex;gap:4px;overflow-x:auto;padding-bottom:0}
+nav button{background:none;border:0;color:rgba(255,255,255,.78);padding:12px 14px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;font-weight:600}
+nav button[aria-selected="true"]{color:#fff;border-bottom-color:var(--soleil)}
+nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--soleil);color:#13201A;font-size:.75rem;text-align:center}
+
+main{padding:28px 0 60px}
+section[hidden]{display:none}
+.lede{max-width:62ch;color:var(--doux);margin:6px 0 24px}
+h2{font-size:1.7rem;font-weight:700}
+
+/* Plaque d'immatriculation : l'élément signature */
+.plaque{display:inline-flex;align-items:stretch;border:3px solid var(--plaque-trait);border-radius:8px;background:var(--plaque);color:#13201A;overflow:hidden;font:800 1.5rem/1 "Bricolage Grotesque",sans-serif;letter-spacing:.06em}
+.plaque .pays{background:var(--ocean);color:#fff;font-size:.7rem;letter-spacing:.04em;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 7px;gap:3px}
+.plaque .pays i{display:block;width:16px;height:11px;background:linear-gradient(#1E8C4E 0 33.3%,#F2C230 33.3% 66.6%,#2260AE 66.6%)}
+.plaque .num{padding:10px 14px}
+.plaque.sm{font-size:1.05rem;border-width:2px}.plaque.sm .num{padding:6px 10px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px}
+.vehicule{background:var(--surface);border:1px solid var(--trait);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.v-head{padding:18px 18px 14px;display:flex;flex-direction:column;gap:12px}
+.v-meta{color:var(--doux);font-size:.92rem}
+.statut{padding:10px 18px;font-weight:700;font-size:.95rem}
+.statut.ok{background:var(--ok-bg);color:var(--ok)}
+.statut.warn{background:var(--warn-bg);color:var(--warn)}
+.statut.ko{background:var(--ko-bg);color:var(--ko)}
+.docs{list-style:none;margin:0;padding:6px 18px 12px}
+.docs li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--trait);font-size:.95rem}
+.docs li:last-child{border-bottom:0}
+.pill{font-size:.78rem;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.ko{background:var(--ko-bg);color:var(--ko)}
+.v-actions{display:flex;gap:8px;padding:12px 18px 18px;margin-top:auto;flex-wrap:wrap}
+
+.btn{border:0;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer;background:var(--foret);color:#fff}
+.btn:hover{background:var(--foret-2)}
+.btn.ghost{background:transparent;color:var(--encre);border:1px solid var(--trait)}
+.btn.ghost:hover{border-color:var(--doux)}
+.btn.jaune{background:var(--soleil);color:#13201A}
+.btn.danger{background:transparent;color:var(--ko);border:1px solid var(--trait)}
+
+.toolbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.toolbar .lede{margin-bottom:0}
+
+.empty{border:2px dashed var(--trait);border-radius:14px;padding:40px 20px;text-align:center;color:var(--doux)}
+
+/* Formulaires */
+.panel{background:var(--surface);border:1px solid var(--trait);border-radius:14px;padding:22px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.form .full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:5px;font-size:.88rem;font-weight:600}
+input,select{border:1px solid var(--trait);background:var(--fond);border-radius:9px;padding:10px 12px;font-weight:400;min-width:0}
+fieldset{border:1px solid var(--trait);border-radius:12px;padding:14px;margin:0}
+legend{font-weight:700;padding:0 6px}
+
+/* Contrôle */
+.controle{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;align-items:start}
+.search{display:flex;gap:8px}
+.search input{flex:1;font-size:1.2rem;text-transform:uppercase;letter-spacing:.05em}
+.verdict{border-radius:14px;padding:22px;border:1px solid var(--trait);background:var(--surface)}
+.verdict .big{font:800 1.8rem "Bricolage Grotesque",sans-serif;margin:14px 0 4px}
+.verdict.ok{border-color:var(--ok);background:var(--ok-bg)}
+.verdict.ok .big{color:var(--ok)}
+.verdict.warn{border-color:var(--warn);background:var(--warn-bg)}
+.verdict.warn .big{color:var(--warn)}
+.verdict.ko{border-color:var(--ko);background:var(--ko-bg)}
+.verdict.ko .big{color:var(--ko)}
+
+/* Alertes */
+.alertes{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.alertes li{background:var(--surface);border:1px solid var(--trait);border-left:5px solid var(--warn);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.alertes li.ko{border-left-color:var(--ko)}
+
+/* Modale */
+dialog{border:0;border-radius:16px;padding:0;background:var(--surface);color:var(--encre);width:min(640px,calc(100% - 24px));max-height:calc(100% - 40px)}
+dialog::backdrop{background:rgba(10,20,15,.55)}
+.d-head{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--trait)}
+.d-body{padding:22px;overflow:auto}
+.d-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px;border-top:1px solid var(--trait)}
+.x{background:none;border:0;font-size:1.5rem;cursor:pointer;color:var(--doux)}
+.qr-box{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+#qr{background:#fff;padding:14px;border-radius:12px}
+.code{font:700 1.1rem "Bricolage Grotesque",sans-serif;letter-spacing:.12em}
+.pay{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.pay label{flex-direction:row;align-items:center;gap:10px;border:1px solid var(--trait);border-radius:10px;padding:12px;cursor:pointer}
+.pay label:has(input:checked){border-color:var(--foret);background:var(--ok-bg)}
+.note{font-size:.85rem;color:var(--doux)}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--encre);color:var(--fond);padding:12px 18px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+/* Scanner */
+.scan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.viseur{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:1/1;max-width:420px;margin:0 auto}
+.viseur video{width:100%;height:100%;object-fit:cover;display:block}
+.viseur::after{content:"";position:absolute;inset:18%;border:3px solid var(--soleil);border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.scan-msg{text-align:center;margin:14px 0 0;min-height:1.5em}
+.scan-msg.ko{color:var(--ko);font-weight:600}
+
+/* Tableau de bord */
+.filtres{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:22px}
+.filtres label.check{flex-direction:row;align-items:center;gap:8px;font-weight:500}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--surface);border:1px solid var(--trait);border-radius:12px;padding:16px}
+.kpi b{display:block;font:800 2rem/1.1 "Bricolage Grotesque",sans-serif}
+.kpi span{color:var(--doux);font-size:.88rem}
+.kpi.ok b{color:var(--ok)}.kpi.ko b{color:var(--ko)}.kpi.warn b{color:var(--warn)}
+.bars{display:flex;flex-direction:column;gap:12px}
+.bar-row{display:grid;grid-template-columns:150px minmax(0,1fr) 64px;gap:12px;align-items:center;font-size:.92rem}
+.bar-row .nom{font-weight:600}
+.bar-row .nom small{display:block;font-weight:400;color:var(--doux)}
+.bar{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--trait)}
+.bar i{display:block;height:100%}
+.bar .s-ok{background:var(--ok)}.bar .s-warn{background:var(--soleil)}.bar .s-ko{background:var(--ko)}
+.taux{text-align:right;font-weight:700}
+.legende{display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--doux);margin:0 0 14px}
+.legende span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.dash-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:9px 6px;border-bottom:1px solid var(--trait);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--doux);font-weight:600}
+td.hot{color:var(--ko);font-weight:700}
+@media (max-width:860px){ .dash-grid{grid-template-columns:1fr} .bar-row{grid-template-columns:110px minmax(0,1fr) 52px} }
+
+footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);font-size:.85rem}
+
+@media (max-width:760px){ .controle{grid-template-columns:1fr} h2{font-size:1.45rem} .pay{grid-template-columns:1fr} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+
+.role{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;background:rgba(255,255,255,.16);font-size:.78rem;font-weight:700;vertical-align:middle}
+.bandeau{margin:0 0 20px;padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--trait)}
+.bandeau.ko{border-color:var(--ko);background:var(--ko-bg);color:var(--ko)}
+.personnes{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.personnes li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--trait);border-radius:10px;background:var(--surface)}
+.personnes img{width:30px;height:30px;border-radius:50%;vertical-align:middle;margin-right:10px}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;color:var(--doux)}
+.live::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.deux{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div class="logo">
+        <div class="logo-mark" aria-hidden="true">T</div>
+        <div><h1>TransDoc <span class="role" id="roleBadge" hidden></span></h1><small>Registre national des documents de transport · République Gabonaise</small></div>
+      </div>
+      <button class="theme-btn" id="themeBtn" aria-label="Changer de thème">◐</button>
+    </div>
+    <nav role="tablist" id="nav">
+      <button role="tab" aria-selected="true" data-tab="vehicules">Mes véhicules</button>
+      <button role="tab" aria-selected="false" data-tab="alertes">Échéances<span class="count" id="nbAlertes">0</span></button>
+      <button role="tab" aria-selected="false" data-tab="controle" data-roles="agent admin" hidden>Contrôle routier</button>
+      <button role="tab" aria-selected="false" data-tab="stats" data-roles="agent admin" hidden>Tableau de bord</button>
+      <button role="tab" aria-selected="false" data-tab="agents" data-roles="admin" hidden>Agents</button>
+      <button role="tab" aria-selected="false" data-tab="profil">Mon compte</button>
+      <button role="tab" aria-selected="false" data-tab="apropos">À propos</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="bandeau" id="bandeau">Connexion au registre national…</div>
+
+  <!-- MES VÉHICULES -->
+  <section id="vehicules">
+    <div class="toolbar">
+      <div>
+        <h2>Mes véhicules</h2>
+        <p class="lede">Vos véhicules sont inscrits au registre national. Les agents de contrôle voient l'état de vos pièces en scannant votre code QR, où qu'ils soient au Gabon.</p>
+      </div>
+      <button class="btn jaune" id="addBtn" disabled>Ajouter un véhicule</button>
+    </div>
+    <div class="grid" id="liste"></div>
+  </section>
+
+  <!-- ALERTES -->
+  <section id="alertes" hidden>
+    <h2>Échéances</h2>
+    <p class="lede">Pièces expirées ou qui expirent dans les 30 prochains jours. Renouvelez-les avant de prendre la route.</p>
+    <ul class="alertes" id="listeAlertes"></ul>
+  </section>
+
+  <!-- CONTRÔLE -->
+  <section id="controle" hidden>
+    <h2>Contrôle routier</h2>
+    <p class="lede">Scannez le code QR du conducteur ou saisissez l'immatriculation. La recherche porte sur tout le registre national et chaque contrôle est enregistré à votre nom.</p>
+    <div class="controle">
+      <div class="panel">
+        <label for="q">Immatriculation ou code TD</label>
+        <div class="search" style="margin-top:6px">
+          <input id="q" placeholder="Ex. ES-2471-A" autocomplete="off">
+          <button class="btn" id="verifBtn">Vérifier</button>
+        </div>
+        <div class="scan-actions">
+          <button class="btn jaune" id="scanBtn">Scanner le QR avec la caméra</button>
+          <label class="btn ghost" style="flex-direction:row;font-weight:700;cursor:pointer">Importer une photo du QR<input type="file" id="scanFile" accept="image/*" capture="environment" hidden></label>
+        </div>
+        <h3 style="font-size:1.05rem;margin:22px 0 6px">Mes derniers contrôles</h3>
+        <ul class="docs" id="mesControles" style="padding:0"></ul>
+      </div>
+      <div id="verdict" class="verdict">
+        <strong>Aucune vérification en cours</strong>
+        <p class="note" style="margin:6px 0 0">Le résultat apparaîtra ici avec l'état de chaque pièce.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- TABLEAU DE BORD -->
+  <section id="stats" hidden>
+    <div class="toolbar">
+      <div>
+        <h2>Tableau de bord par province</h2>
+        <p class="lede">Conformité du registre national, mise à jour en direct à chaque enregistrement, renouvellement ou contrôle.</p>
+      </div>
+      <span class="live">En direct</span>
+    </div>
+    <div class="filtres">
+      <label>Catégorie
+        <select id="fCat"><option value="">Toutes les catégories</option><option>Véhicule particulier</option><option>Taxi</option><option>Clando / transport en commun</option><option>Camion / poids lourd</option><option>Bus</option><option>Moto</option></select>
+      </label>
+      <label>Trier par
+        <select id="fTri"><option value="n">Nombre de véhicules</option><option value="taux">Taux de conformité</option><option value="nom">Nom de province</option></select>
+      </label>
+      <label class="check"><input type="checkbox" id="fSim" checked> Inclure les données de démonstration</label>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="dash-grid">
+      <div class="panel">
+        <h3 style="font-size:1.15rem;margin-bottom:10px">Conformité par province</h3>
+        <div class="legende"><span style="--c:var(--ok)">Conforme</span><span style="--c:var(--soleil)">Échéance sous 30 j</span><span style="--c:var(--ko)">Non conforme</span></div>
+        <div class="bars" id="bars"></div>
+      </div>
+      <div class="panel">
+        <h3 style="font-size:1.15rem;margin-bottom:10px">Pièces expirées par province</h3>
+        <div class="table-wrap"><table id="tab"></table></div>
+        <h3 style="font-size:1.15rem;margin:22px 0 8px">Contrôles effectués</h3>
+        <div id="ctrlStats" class="note"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENTS -->
+  <section id="agents" hidden>
+    <h2>Agents de contrôle</h2>
+    <p class="lede">Habilitez les agents de la Police, de la Gendarmerie et de la DGTT. Un agent habilité accède au contrôle routier et au tableau de bord.</p>
+    <div class="deux">
+      <div class="panel">
+        <label>Rechercher une personne de l'organisation
+          <input id="agentQ" placeholder="Nom ou adresse e-mail" autocomplete="off">
+        </label>
+        <ul class="personnes" id="agentHits"></ul>
+      </div>
+      <div class="panel">
+        <h3 style="font-size:1.1rem">Agents habilités</h3>
+        <ul class="personnes" id="agentListe"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- MON COMPTE -->
+  <section id="profil" hidden>
+    <h2>Mon compte</h2>
+    <p class="lede">Vos coordonnées restent privées : ni les agents ni l'administration ne voient votre numéro dans cette application.</p>
+    <div class="deux">
+      <form class="panel form" id="profilForm">
+        <label class="full">Nom et prénom<input name="nom" required placeholder="Nom et prénom"></label>
+        <label class="full">Téléphone pour les rappels<input name="tel" type="tel" placeholder="+241 07 00 00 00"></label>
+        <label class="check full" style="flex-direction:row;align-items:center;gap:8px;font-weight:500"><input type="checkbox" name="sms"> Recevoir les rappels par SMS avant chaque échéance</label>
+        <div class="full"><button class="btn" type="submit">Enregistrer mon compte</button></div>
+      </form>
+      <div class="panel">
+        <h3 style="font-size:1.1rem;margin-bottom:6px">Prochains rappels SMS</h3>
+        <p class="note" style="margin-top:0">Rappels à J-30, J-7 et J-1, puis le lendemain d'une expiration. Ils sont envoyés par le serveur TransDoc une fois le fournisseur SMS raccordé.</p>
+        <ul class="docs" id="rappels" style="padding:0"></ul>
+        <h3 style="font-size:1.1rem;margin:20px 0 6px">Mes paiements</h3>
+        <ul class="docs" id="mesPaiements" style="padding:0"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- À PROPOS -->
+  <section id="apropos" hidden>
+    <h2>À propos de TransDoc</h2>
+    <div class="panel" style="max-width:70ch;margin-top:18px">
+      <p style="margin-top:0">TransDoc dématérialise le suivi de conformité des véhicules au Gabon, sur le modèle de la plateforme SÉCUROUTE mise en place au Bénin. Chaque véhicule dispose d'un code QR unique que les forces de l'ordre scannent pour vérifier ses pièces en quelques secondes.</p>
+      <h3 style="font-size:1.1rem;margin:18px 0 8px">Trois rôles</h3>
+      <p><strong>Propriétaire</strong> : inscrit ses véhicules, reçoit les rappels et renouvelle ses pièces. <strong>Agent</strong> : contrôle n'importe quel véhicule du registre. <strong>Administrateur</strong> : habilite les agents et suit les statistiques nationales.</p>
+      <h3 style="font-size:1.1rem;margin:18px 0 8px">Ce qui est déjà réel ici</h3>
+      <p>Le registre est centralisé et partagé en direct entre tous les utilisateurs, et chaque compte est identifié. Chaque propriétaire ne peut modifier que ses propres véhicules. Le scanner QR fonctionne avec la caméra.</p>
+      <p class="note" style="margin-bottom:0">Les vérifications auprès du Ministère et des assureurs, les paiements mobile money et l'envoi des SMS passent par le serveur TransDoc. Ils sont simulés dans cette version jusqu'au raccordement des partenaires.</p>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">TransDoc Gabon · Estuaire, Haut-Ogooué, Moyen-Ogooué, Ngounié, Nyanga, Ogooué-Ivindo, Ogooué-Lolo, Ogooué-Maritime, Woleu-Ntem.</div></footer>
+
+<!-- Modale ajout / modification -->
+<dialog id="dlgForm">
+  <form method="dialog" id="vForm">
+    <div class="d-head"><h3 id="formTitre">Ajouter un véhicule</h3><button type="button" class="x" data-close aria-label="Fermer">×</button></div>
+    <div class="d-body">
+      <div class="form">
+        <label>Immatriculation<input name="plaque" required placeholder="ES-1234-A"></label>
+        <label>Catégorie
+          <select name="categorie"><option>Véhicule particulier</option><option>Taxi</option><option>Clando / transport en commun</option><option>Camion / poids lourd</option><option>Bus</option><option>Moto</option></select>
+        </label>
+        <label>Marque<input name="marque" required placeholder="Toyota"></label>
+        <label>Modèle<input name="modele" placeholder="Hilux"></label>
+        <label>Titulaire de la carte grise<input name="proprietaire" required placeholder="Nom et prénom ou société"></label>
+        <label>Province
+          <select name="province"><option>Estuaire</option><option>Haut-Ogooué</option><option>Moyen-Ogooué</option><option>Ngounié</option><option>Nyanga</option><option>Ogooué-Ivindo</option><option>Ogooué-Lolo</option><option>Ogooué-Maritime</option><option>Woleu-Ntem</option></select>
+        </label>
+        <fieldset class="full"><legend>Pièces</legend>
+          <div class="form">
+            <label>N° carte grise<input name="cartegrise" required placeholder="CG-000000"></label>
+            <label>Assurance : expiration<input type="date" name="assurance" required></label>
+            <label>Visite technique : expiration<input type="date" name="visite" required></label>
+            <label>Vignette : expiration<input type="date" name="vignette" required></label>
+          </div>
+        </fieldset>
+      </div>
+    </div>
+    <div class="d-foot"><button type="button" class="btn ghost" data-close>Annuler</button><button class="btn" type="submit" id="saveBtn">Enregistrer le véhicule</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgQR">
+  <div class="d-head"><h3>Code QR du véhicule</h3><button class="x" data-close aria-label="Fermer">×</button></div>
+  <div class="d-body qr-box">
+    <div id="qrPlaque"></div>
+    <div id="qr"></div>
+    <div class="code" id="qrCode"></div>
+    <p class="note">Présentez ce code à l'agent. Il reste valable après chaque renouvellement : l'état est lu en direct dans le registre.</p>
+  </div>
+</dialog>
+
+<dialog id="dlgPay">
+  <div class="d-head"><h3 id="payTitre">Renouveler</h3><button class="x" data-close aria-label="Fermer">×</button></div>
+  <div class="d-body">
+    <p id="payDesc" style="margin-top:0"></p>
+    <div class="pay">
+      <label><input type="radio" name="op" value="Airtel Money" checked> Airtel Money</label>
+      <label><input type="radio" name="op" value="Moov Money"> Moov Money</label>
+    </div>
+    <label>Numéro mobile money<input id="payTel" type="tel" placeholder="+241 07 00 00 00"></label>
+    <p class="note">Paiement simulé : aucun montant n'est débité. Avec le serveur TransDoc, vous validerez le paiement avec votre code secret sur votre téléphone.</p>
+  </div>
+  <div class="d-foot"><button class="btn ghost" data-close>Annuler</button><button class="btn" id="payBtn">Payer et renouveler</button></div>
+</dialog>
+
+<dialog id="dlgScan">
+  <div class="d-head"><h3>Scanner un code QR TransDoc</h3><button class="x" data-close aria-label="Fermer">×</button></div>
+  <div class="d-body">
+    <div class="viseur"><video id="video" playsinline muted></video></div>
+    <p class="scan-msg" id="scanMsg">Placez le code QR dans le cadre.</p>
+  </div>
+</dialog>
+<canvas id="scanCanvas" hidden></canvas>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+  const DOCS=[['assurance','Assurance',35000],['visite','Visite technique',25000],['vignette','Vignette',50000]];
+  const PROVINCES=['Estuaire','Haut-Ogooué','Moyen-Ogooué','Ngounié','Nyanga','Ogooué-Ivindo','Ogooué-Lolo','Ogooué-Maritime','Woleu-Ntem'];
+  const ROLES={admin:'Administrateur',agent:'Agent de contrôle',proprietaire:'Propriétaire'};
+  const $=s=>document.querySelector(s);
+  const fmtDate=d=>new Date(d+'T00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+  const iso=d=>d.toISOString().slice(0,10);
+  const plus=j=>{const d=new Date();d.setDate(d.getDate()+j);return iso(d)};
+  const norm=s=>(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const newCode=()=>'TD'+Array.from(crypto.getRandomValues(new Uint8Array(6)),b=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b%32]).join('');
+
+  // ---------- État ----------
+  const S={db:null,user:null,me:null,admin:false,roles:{agents:[]},reg:{},ctrl:{},profil:{},paie:[],pret:false,lecture:false};
+  const role=()=>S.admin?'admin':(S.me&&(S.roles.agents||[]).includes(S.me))?'agent':'proprietaire';
+  const tous=()=>Object.entries(S.reg).flatMap(([oid,d])=>Object.values(d?.vehicules||{}).map(v=>({...v,ownerId:oid,demo:!!d?.demo})));
+  const mesVeh=()=>S.reg[S.me]?.vehicules||{};
+
+  function etat(date){
+    const j=Math.ceil((new Date(date+'T00:00')-new Date(new Date().toDateString()))/864e5);
+    if(isNaN(j)||j<0) return {c:'ko',t:'Expirée',j:isNaN(j)?-1:j};
+    if(j<=30) return {c:'warn',t:j===0?"Expire aujourd'hui":`Expire dans ${j} j`,j};
+    return {c:'ok',t:'Valide',j};
+  }
+  function global(v){
+    const e=DOCS.map(([k])=>etat(v[k]).c);
+    if(e.includes('ko')) return {c:'ko',t:'Non conforme : pièce expirée'};
+    if(e.includes('warn')) return {c:'warn',t:'Conforme, renouvellement proche'};
+    return {c:'ok',t:'Conforme'};
+  }
+  const plaqueHTML=(p,sm)=>`<span class="plaque${sm?' sm':''}"><span class="pays"><i></i>GA</span><span class="num">${esc(p)}</span></span>`;
+
+  // Une écriture à la fois, erreurs transformées en messages clairs
+  let file=Promise.resolve();
+  function ecrire(fn,okMsg){
+    file=file.then(fn).then(()=>{okMsg&&toast(okMsg)}).catch(e=>{
+      console.error(e);
+      toast(e?.code==='invalid_argument'?"Enregistrement refusé : votre accès ne permet pas cette modification.":e?.code==='quota_exceeded'?"Registre plein : contactez l'administrateur.":"Enregistrement impossible pour l'instant. Réessayez.");
+    });
+    return file;
+  }
+
+  // ---------- Rendu ----------
+  function bandeau(t,ko){const b=$('#bandeau');b.hidden=!t;b.className='bandeau'+(ko?' ko':'');b.textContent=t||''}
+  function appliquerRole(){
+    const r=role(); $('#roleBadge').hidden=!S.pret; $('#roleBadge').textContent=ROLES[r];
+    document.querySelectorAll('nav [data-roles]').forEach(b=>{
+      const ok=b.dataset.roles.split(' ').includes(r); b.hidden=!ok;
+      if(!ok&&b.getAttribute('aria-selected')==='true') document.querySelector('[data-tab="vehicules"]').click();
+    });
+    $('#addBtn').disabled=!S.pret||S.lecture||!S.me;
+  }
+  function renderListe(){
+    const el=$('#liste'), vs=Object.values(mesVeh());
+    if(!S.pret){el.innerHTML='';return}
+    if(!vs.length){el.innerHTML='<div class="empty">Aucun véhicule à votre nom. Ajoutez votre premier véhicule pour obtenir son code QR.</div>';return}
+    el.innerHTML=vs.map(v=>{const g=global(v);const k=norm(v.plaque);return `<article class="vehicule">
+      <div class="v-head">${plaqueHTML(v.plaque)}
+        <div class="v-meta"><strong style="color:var(--encre)">${esc(v.marque)} ${esc(v.modele)}</strong> · ${esc(v.categorie)}<br>${esc(v.proprietaire)} · ${esc(v.province)}</div></div>
+      <div class="statut ${g.c}">${g.t}</div>
+      <ul class="docs"><li><span>Carte grise</span><span class="note">${esc(v.cartegrise)}</span></li>
+        ${DOCS.map(([d,l])=>{const e=etat(v[d]);return `<li><span>${l}<br><span class="note">jusqu'au ${fmtDate(v[d])}</span></span><span class="pill ${e.c}">${e.t}</span></li>`}).join('')}</ul>
+      <div class="v-actions">
+        <button class="btn" data-qr="${k}">Afficher le QR</button>
+        <button class="btn ghost" data-edit="${k}">Modifier</button>
+        <button class="btn danger" data-del="${k}">Supprimer</button>
+      </div></article>`}).join('');
+  }
+  function mesAlertes(){
+    const out=[]; Object.values(mesVeh()).forEach(v=>DOCS.forEach(([k,l,prix])=>{const e=etat(v[k]); if(e.c!=='ok') out.push({v,k,l,prix,e})}));
+    return out.sort((a,b)=>a.e.j-b.e.j);
+  }
+  function renderAlertes(){
+    const a=mesAlertes(); $('#nbAlertes').textContent=a.length;
+    $('#listeAlertes').innerHTML=a.length?a.map(x=>`<li class="${x.e.c}">
+      <div>${plaqueHTML(x.v.plaque,true)} <strong style="margin-left:8px">${x.l}</strong><br><span class="note">${x.e.t} — échéance le ${fmtDate(x.v[x.k])}</span></div>
+      <button class="btn" data-pay="${norm(x.v.plaque)}|${x.k}">Renouveler</button></li>`).join('')
+      :'<li style="border-left-color:var(--ok)">Toutes vos pièces sont à jour.</li>';
+  }
+  function renderProfil(){
+    const f=$('#profilForm'); if(document.activeElement?.form!==f){f.nom.value=S.profil.nom||'';f.tel.value=S.profil.tel||'';f.sms.checked=S.profil.sms!==false}
+    const r=[]; const auj=iso(new Date());
+    Object.values(mesVeh()).forEach(v=>DOCS.forEach(([k,l])=>[30,7,1,-1].forEach(j=>{const d=new Date(v[k]+'T00:00');d.setDate(d.getDate()-j);const di=iso(d); if(di>=auj) r.push({di,t:`${l} · ${v.plaque}`,j})})));
+    r.sort((a,b)=>a.di.localeCompare(b.di));
+    $('#rappels').innerHTML=!(S.profil.sms!==false)?'<li class="note">Rappels SMS désactivés.</li>':r.length?r.slice(0,6).map(x=>`<li><span>${esc(x.t)}<br><span class="note">${x.j<0?"lendemain de l'expiration":`J-${x.j}`}</span></span><span class="note">${fmtDate(x.di)}</span></li>`).join(''):'<li class="note">Aucun rappel à venir.</li>';
+    $('#mesPaiements').innerHTML=S.paie.length?S.paie.slice(0,8).map(p=>`<li><span>${esc(p.piece)} · ${esc(p.plaque)}<br><span class="note">${esc(p.operateur)} · réf. ${esc(p.ref)}</span></span><span class="note">${Number(p.montant).toLocaleString('fr-FR')} FCFA<br>${new Date(p.t).toLocaleDateString('fr-FR')}</span></li>`).join(''):'<li class="note">Aucun paiement.</li>';
+  }
+  function tousControles(){return Object.entries(S.ctrl).flatMap(([aid,d])=>(d?.liste||[]).map(c=>({...c,agentId:aid})))}
+  function renderMesControles(){
+    const l=(S.ctrl[S.me]?.liste||[]).slice(0,6);
+    $('#mesControles').innerHTML=l.length?l.map(c=>`<li><span>${plaqueHTML(c.plaque||'?',true)}<br><span class="note">${new Date(c.t).toLocaleString('fr-FR')} · ${c.source==='qr'?'QR':'saisie'}</span></span><span class="pill ${c.c==='introuvable'?'ko':c.c}">${c.c==='ok'?'Conforme':c.c==='warn'?'À renouveler':c.c==='ko'?'Non conforme':'Introuvable'}</span></li>`).join(''):'<li class="note">Aucun contrôle pour le moment.</li>';
+  }
+  function renderStats(){
+    if($('#stats').hidden&&document.querySelector('[data-tab=stats]').hidden) return;
+    const cat=$('#fCat').value, tri=$('#fTri').value;
+    let parc=tous().filter(v=>$('#fSim').checked||!v.demo); if(cat) parc=parc.filter(v=>v.categorie===cat);
+    const par={}; PROVINCES.forEach(n=>par[n]={n,tot:0,ok:0,warn:0,ko:0,exp:{assurance:0,visite:0,vignette:0}});
+    let exp=0,proches=0;
+    parc.forEach(v=>{const P=par[v.province]; if(!P) return; P.tot++; P[global(v).c]++;
+      DOCS.forEach(([k])=>{const e=etat(v[k]).c; if(e==='ko'){P.exp[k]++;exp++} if(e==='warn') proches++})});
+    const tot=parc.length, conf=parc.filter(v=>global(v).c!=='ko').length, pct=(a,b)=>b?Math.round(a*100/b):0;
+    $('#kpis').innerHTML=`<div class="kpi"><b>${tot.toLocaleString('fr-FR')}</b><span>véhicules au registre</span></div>
+      <div class="kpi ok"><b>${pct(conf,tot)} %</b><span>taux de conformité</span></div>
+      <div class="kpi ko"><b>${exp.toLocaleString('fr-FR')}</b><span>pièces expirées</span></div>
+      <div class="kpi warn"><b>${proches.toLocaleString('fr-FR')}</b><span>pièces à renouveler sous 30 jours</span></div>`;
+    const rows=Object.values(par); rows.forEach(r=>r.taux=pct(r.ok+r.warn,r.tot));
+    rows.sort(tri==='nom'?(a,b)=>a.n.localeCompare(b.n,'fr'):tri==='taux'?(a,b)=>b.taux-a.taux:(a,b)=>b.tot-a.tot);
+    $('#bars').innerHTML=rows.map(r=>`<div class="bar-row" title="${r.ok} conformes, ${r.warn} à renouveler, ${r.ko} non conformes">
+      <div class="nom">${r.n}<small>${r.tot} véhicule${r.tot>1?'s':''}</small></div>
+      <div class="bar" role="img" aria-label="${r.n} : ${r.taux} % conformes">${r.tot?`<i class="s-ok" style="width:${r.ok*100/r.tot}%"></i><i class="s-warn" style="width:${r.warn*100/r.tot}%"></i><i class="s-ko" style="width:${r.ko*100/r.tot}%"></i>`:''}</div>
+      <div class="taux">${r.tot?r.taux+' %':'—'}</div></div>`).join('');
+    const max=Math.max(1,...rows.flatMap(r=>Object.values(r.exp)));
+    $('#tab').innerHTML=`<thead><tr><th>Province</th><th>Assur.</th><th>Visite</th><th>Vign.</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.n}</td>${['assurance','visite','vignette'].map(k=>`<td class="${r.exp[k]>=max*0.6&&r.exp[k]>0?'hot':''}">${r.exp[k]}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    const c=tousControles(), auj=new Date().toDateString(), agents=new Set(c.map(x=>x.agentId));
+    $('#ctrlStats').textContent=c.length?`${c.length} contrôle${c.length>1?'s':''} par ${agents.size} agent${agents.size>1?'s':''}, dont ${c.filter(x=>new Date(x.t).toDateString()===auj).length} aujourd'hui. ${c.filter(x=>x.c==='ko').length} véhicule(s) non conforme(s) détecté(s), ${c.filter(x=>x.source==='qr').length} contrôle(s) par QR.`:"Aucun contrôle enregistré pour l'instant.";
+  }
+  async function renderAgents(){
+    if(!S.admin) return;
+    const ids=S.roles.agents||[]; const ps=S.user&&ids.length?await S.user.profiles(ids):{};
+    $('#agentListe').innerHTML=ids.length?ids.map(id=>`<li><span><img alt="" src="${esc(ps[id]?.avatarUrl||'')}">${esc(ps[id]?.name||'Agent')}</span><button class="btn danger" data-retirer="${esc(id)}">Retirer</button></li>`).join(''):'<li class="note">Aucun agent habilité.</li>';
+  }
+  function render(){appliquerRole();renderListe();renderAlertes();renderProfil();renderMesControles();renderStats();renderAgents()}
+
+  // ---------- Onglets, thème, modales ----------
+  document.querySelectorAll('nav [data-tab]').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('nav [data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b));
+    document.querySelectorAll('main section').forEach(s=>s.hidden=s.id!==b.dataset.tab);
+    try{sessionStorage.setItem('transdoc.tab',b.dataset.tab)}catch(e){}
+    if(b.dataset.tab==='stats') renderStats();
+  });
+  $('#themeBtn').onclick=()=>{const r=document.documentElement,d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark'};
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
+  ['#fCat','#fTri','#fSim'].forEach(x=>$(x).addEventListener('change',renderStats));
+  let tm; function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tm);tm=setTimeout(()=>t.classList.remove('on'),3000)}
+
+  // ---------- Véhicules ----------
+  const form=$('#vForm'); let editKey=null;
+  function ouvrirForm(v){
+    editKey=v?norm(v.plaque):null; form.reset();
+    $('#formTitre').textContent=v?'Modifier le véhicule':'Ajouter un véhicule';
+    $('#saveBtn').textContent=v?'Enregistrer les modifications':'Enregistrer le véhicule';
+    form.plaque.readOnly=!!v;
+    if(v){ for(const [k,val] of Object.entries(v)) if(form.elements[k]) form.elements[k].value=val; }
+    else { form.assurance.value=plus(365); form.visite.value=plus(180); form.vignette.value=plus(365); form.proprietaire.value=S.profil.nom||''; }
+    $('#dlgForm').showModal();
+  }
+  $('#addBtn').onclick=()=>ouvrirForm();
+  form.onsubmit=e=>{
+    const f=Object.fromEntries(new FormData(form)); f.plaque=f.plaque.toUpperCase().trim(); const k=norm(f.plaque);
+    if(k.length<4){e.preventDefault();toast("Immatriculation trop courte.");return}
+    if(!editKey&&tous().some(v=>norm(v.plaque)===k)){e.preventDefault();toast('Cette immatriculation est déjà inscrite au registre. Si le véhicule vous appartient, contactez la DGTT.');return}
+    const vehs={...mesVeh()}; const ancien=vehs[k];
+    vehs[k]={code:ancien?.code||newCode(),...f,maj:Date.now()};
+    ecrire(()=>S.db.doc('registre/'+S.me).set({vehicules:vehs,maj:Date.now()}),editKey?'Véhicule modifié.':'Véhicule inscrit au registre national.');
+  };
+
+  document.addEventListener('click',e=>{
+    const t=e.target.closest('button'); if(!t) return;
+    const V=mesVeh();
+    if(t.dataset.edit) ouvrirForm(V[t.dataset.edit]);
+    if(t.dataset.del){const v=V[t.dataset.del]; if(v&&confirm(`Retirer le véhicule ${v.plaque} du registre ?`)){const n={...V};delete n[t.dataset.del];ecrire(()=>S.db.doc('registre/'+S.me).set({vehicules:n,maj:Date.now()}),'Véhicule retiré du registre.')}}
+    if(t.dataset.qr){
+      const v=V[t.dataset.qr]; $('#qrPlaque').innerHTML=plaqueHTML(v.plaque); $('#qrCode').textContent=v.code; $('#qr').innerHTML='';
+      if(window.QRCode) new QRCode($('#qr'),{text:JSON.stringify({app:'TransDoc-GA',code:v.code,plaque:v.plaque}),width:200,height:200,correctLevel:QRCode.CorrectLevel.M});
+      else $('#qr').textContent='QR indisponible';
+      $('#dlgQR').showModal();
+    }
+    if(t.dataset.pay){
+      const [k,piece]=t.dataset.pay.split('|'); const v=V[k]; const d=DOCS.find(x=>x[0]===piece);
+      payCible={k,piece}; $('#payTitre').textContent=`Renouveler : ${d[1]}`;
+      $('#payDesc').innerHTML=`Véhicule <strong>${esc(v.plaque)}</strong>. Montant indicatif : <strong>${d[2].toLocaleString('fr-FR')} FCFA</strong>.`;
+      $('#payTel').value=S.profil.tel||''; $('#dlgPay').showModal();
+    }
+    if(t.dataset.habiliter){const n=[...new Set([...(S.roles.agents||[]),t.dataset.habiliter])];ecrire(()=>S.db.doc('config/roles').set({agents:n}),'Agent habilité.');$('#agentHits').innerHTML='';$('#agentQ').value=''}
+    if(t.dataset.retirer&&confirm("Retirer l'habilitation de cet agent ?")){const n=(S.roles.agents||[]).filter(x=>x!==t.dataset.retirer);ecrire(()=>S.db.doc('config/roles').set({agents:n}),'Habilitation retirée.')}
+  });
+
+  let payCible=null;
+  $('#payBtn').onclick=()=>{
+    const tel=$('#payTel').value.trim(); if(!tel){toast('Indiquez le numéro mobile money.');return}
+    const {k,piece}=payCible, vehs={...mesVeh()}, v={...vehs[k]}, d=DOCS.find(x=>x[0]===piece);
+    const base=new Date(Math.max(new Date(v[piece]+'T00:00'),new Date(new Date().toDateString()))); base.setFullYear(base.getFullYear()+1);
+    v[piece]=iso(base); vehs[k]=v;
+    const op=document.querySelector('[name=op]:checked').value, ref='TD-'+iso(new Date()).replace(/-/g,'')+'-'+newCode().slice(2);
+    $('#dlgPay').close();
+    ecrire(()=>S.db.doc('registre/'+S.me).set({vehicules:vehs,maj:Date.now()}));
+    ecrire(()=>S.db.doc(`data/users/${S.me}/paiements`).set({liste:[{ref,plaque:v.plaque,piece:d[1],montant:d[2],operateur:op,t:Date.now()},...S.paie].slice(0,100)}),`Paiement ${op} accepté. ${d[1]} renouvelée.`);
+  };
+
+  $('#profilForm').onsubmit=e=>{e.preventDefault();const f=e.target;
+    ecrire(()=>S.db.doc(`data/users/${S.me}/profil`).set({nom:f.nom.value.trim(),tel:f.tel.value.trim(),sms:f.sms.checked}),'Compte enregistré.')};
+
+  $('#agentQ').addEventListener('focus',e=>chercher(e.target.value));
+  $('#agentQ').addEventListener('input',e=>chercher(e.target.value));
+  async function chercher(qs){
+    if(!S.user) return; const hits=await S.user.search(qs||''); const ag=S.roles.agents||[];
+    const ul=$('#agentHits'); ul.innerHTML='';
+    hits.filter(h=>!h.isMe).forEach(h=>{const li=document.createElement('li');
+      const s=document.createElement('span'); const img=document.createElement('img'); img.alt=''; img.src=h.avatarUrl||''; s.append(img,document.createTextNode(h.name));
+      const b=document.createElement('button'); b.className=ag.includes(h.id)?'btn ghost':'btn'; b.disabled=ag.includes(h.id); b.textContent=ag.includes(h.id)?'Déjà agent':'Habiliter'; b.dataset.habiliter=h.id;
+      li.append(s,b); ul.append(li)});
+    if(!ul.children.length&&qs) ul.innerHTML='<li class="note">Aucune personne trouvée.</li>';
+  }
+
+  // ---------- Contrôle ----------
+  function verifier(source){
+    const q=norm($('#q').value), box=$('#verdict');
+    if(!q){box.className='verdict';box.innerHTML='<strong>Saisissez une immatriculation ou un code TD.</strong>';return}
+    const v=tous().find(x=>norm(x.plaque)===q||x.code===q);
+    const log=c=>{if(!S.me) return; const liste=[{t:Date.now(),plaque:v?.plaque||$('#q').value.toUpperCase(),province:v?.province||'',c,source:source==='qr'?'qr':'saisie'},...(S.ctrl[S.me]?.liste||[])].slice(0,300);
+      ecrire(()=>S.db.doc('controles/'+S.me).set({liste}))};
+    if(!v){log('introuvable');box.className='verdict ko';box.innerHTML=`<strong>Véhicule introuvable</strong><p class="note" style="margin:6px 0 0">Aucun véhicule du registre national ne correspond à « ${esc($('#q').value)} ». Demandez les pièces physiques.</p>`;return}
+    const g=global(v); log(g.c);
+    box.className='verdict '+g.c;
+    box.innerHTML=`${plaqueHTML(v.plaque)}<div class="big">${g.c==='ko'?'Non conforme':'Conforme'}</div>
+      <div class="note">${esc(v.marque)} ${esc(v.modele)} · ${esc(v.categorie)} · ${esc(v.proprietaire)} · ${esc(v.province)}${source==='qr'?' · lu par QR':''}</div>
+      <ul class="docs" style="padding:10px 0 0">${DOCS.map(([k,l])=>{const e=etat(v[k]);return `<li><span>${l}<br><span class="note">jusqu'au ${fmtDate(v[k])}</span></span><span class="pill ${e.c}">${e.t}</span></li>`}).join('')}</ul>
+      <p class="note" style="margin:10px 0 0">Vérifié le ${new Date().toLocaleString('fr-FR')}</p>`;
+  }
+  $('#verifBtn').onclick=()=>verifier(); $('#q').onkeydown=e=>{if(e.key==='Enter')verifier()};
+
+  // Scanner : BarcodeDetector natif, sinon jsQR
+  const video=$('#video'), canvas=$('#scanCanvas'), ctx=canvas.getContext('2d',{willReadFrequently:true});
+  let stream=null, scanning=false, detector=null;
+  try{ if('BarcodeDetector' in window) detector=new BarcodeDetector({formats:['qr_code']}) }catch(e){detector=null}
+  function msg(t,ko){const m=$('#scanMsg');m.textContent=t;m.className='scan-msg'+(ko?' ko':'')}
+  function lireContenu(txt){
+    let code=txt; try{const o=JSON.parse(txt); code=o&&o.app==='TransDoc-GA'?(o.code||o.plaque):null}catch(e){}
+    if(!code||!String(code).trim()) return false; $('#q').value=String(code); verifier('qr'); return true;
+  }
+  async function decoder(src,w,h){
+    if(detector){try{const r=await detector.detect(src); if(r.length) return r[0].rawValue}catch(e){}}
+    if(window.jsQR){canvas.width=w;canvas.height=h;ctx.drawImage(src,0,0,w,h);const r=jsQR(ctx.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'dontInvert'});if(r) return r.data}
+    return null;
+  }
+  async function boucle(){
+    if(!scanning) return;
+    if(video.readyState>=2){const w=video.videoWidth,h=video.videoHeight,s=Math.min(1,640/Math.max(w,h));
+      const txt=await decoder(video,Math.round(w*s),Math.round(h*s));
+      if(txt){if(lireContenu(txt)){navigator.vibrate&&navigator.vibrate(120);$('#dlgScan').close();toast('Code QR lu.');return} msg("Ce code QR n'est pas un code TransDoc.",true)}}
+    requestAnimationFrame(boucle);
+  }
+  function arreter(){scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}video.srcObject=null}
+  $('#dlgScan').addEventListener('close',arreter);
+  $('#scanBtn').onclick=async()=>{
+    msg('Placez le code QR dans le cadre.'); $('#dlgScan').showModal();
+    if(!navigator.mediaDevices?.getUserMedia){msg("La caméra n'est pas disponible sur cet appareil. Importez une photo du QR.",true);return}
+    if(!detector&&!window.jsQR){msg("Le lecteur QR ne s'est pas chargé. Vérifiez la connexion puis réessayez.",true);return}
+    try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=stream;await video.play();scanning=true;boucle()}
+    catch(e){msg(e.name==='NotAllowedError'?"Accès à la caméra refusé. Autorisez la caméra dans le navigateur ou importez une photo du QR.":"Impossible d'ouvrir la caméra. Importez une photo du QR.",true)}
+  };
+  $('#scanFile').onchange=e=>{
+    const f=e.target.files[0]; if(!f) return; const img=new Image();
+    img.onload=async()=>{const s=Math.min(1,1000/Math.max(img.width,img.height));const txt=await decoder(img,Math.round(img.width*s),Math.round(img.height*s));URL.revokeObjectURL(img.src);
+      toast(!txt?'Aucun code QR trouvé sur la photo. Recadrez et réessayez.':lireContenu(txt)?'Code QR lu.':"Ce code QR n'est pas un code TransDoc.");e.target.value=''};
+    img.src=URL.createObjectURL(f);
+  };
+
+  // ---------- Connexion au registre ----------
+  try{const t=sessionStorage.getItem('transdoc.tab'); if(t) document.querySelector(`[data-tab="${t}"]`)?.click()}catch(e){}
+  render();
+  (async()=>{
+    if(!window.claude?.use){bandeau("Ouvrez TransDoc depuis son lien claude.ai pour accéder au registre national.",true);return}
+    const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]);
+    if(!db){bandeau("Le registre national n'est pas accessible depuis cette vue. Ouvrez TransDoc depuis son lien claude.ai, connecté à votre compte.",true);return}
+    S.db=db; S.user=user;
+    if(user){S.me=await user.id(); S.admin=(await user.isOwner())||(await user.canEdit()); S.lecture=(await user.can('data.write'))===false}
+    if(!S.me) bandeau("Consultation seule : connectez-vous à votre compte pour inscrire des véhicules.",true);
+    else if(S.lecture) bandeau("Consultation seule : votre accès ne permet pas de modifier le registre. Demandez l'accès « Peut interagir » à l'administrateur.",true);
+    else bandeau('');
+    const erreur=e=>{if(e?.code==='revoked'||e?.code==='not_granted') bandeau("Votre accès au registre a été retiré.",true)};
+    db.doc('config/roles').onSnapshot(s=>{S.roles=s.exists?s.data():{agents:[]};render()},erreur);
+    db.collection('registre').onSnapshot(s=>{const r={};s.docs.forEach(d=>r[d.id]=d.data());S.reg=r;S.pret=true;render()},erreur);
+    db.collection('controles').onSnapshot(s=>{const c={};s.docs.forEach(d=>c[d.id]=d.data());S.ctrl=c;render()},erreur);
+    if(S.me){
+      db.doc(`data/users/${S.me}/profil`).onSnapshot(s=>{S.profil=s.exists?s.data():{};render()});
+      db.doc(`data/users/${S.me}/paiements`).onSnapshot(s=>{S.paie=s.exists?(s.data().liste||[]):[];renderProfil()});
+    }
+  })();
+})();
+</script>
+</body>
+</html>
