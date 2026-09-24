@@ -1,6 +1,6 @@
 # TransDoc — compilation automatique de l'APK Android.
-# Ce fichier génère le projet Android à partir de transdoc.html et des demo-*.json du dépôt,
-# puis compile TransDoc.apk (onglet Actions → dernière exécution → Artifacts → TransDoc-apk).
+# Génère le projet Android à partir de transdoc.html et des demo-*.json du dépôt, puis compile TransDoc.apk.
+# Résultat : onglet Actions → dernière exécution → Artifacts → TransDoc-apk.
 name: Construire l'APK TransDoc
 
 on:
@@ -26,14 +26,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Installer le SDK Android
-        uses: android-actions/setup-android@v3
-
-      - name: Installer Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
 
       - name: Générer le projet Android
         shell: bash
@@ -461,51 +453,81 @@ jobs:
           cat > "android/outils/construire_index.py" <<'FIN_FICHIER'
           import glob, json, os, re, sys
           racine = os.environ["GITHUB_WORKSPACE"]
-          src = None
-          for nom in ("transdoc.html", "index.html"):
-              for p in glob.glob(os.path.join(racine, "**", nom), recursive=True):
-                  if "/android/" not in p:
-                      src = p; break
-              if src: break
-          if not src:
-              sys.exit("transdoc.html introuvable dans le dépôt : ajoutez-le à la racine.")
-          h = open(src, encoding="utf-8").read()
+          def erreur(msg):
+              print("::error title=TransDoc::" + msg)
+              sys.exit(1)
+          candidats = [p for nom in ("transdoc.html", "index.html")
+                       for p in glob.glob(os.path.join(racine, "**", nom), recursive=True)
+                       if os.sep + "android" + os.sep not in p]
+          if not candidats:
+              erreur("transdoc.html introuvable dans le dépôt. Ajoutez-le à la racine du dépôt.")
+          src = candidats[0]
+          h = open(src, encoding="utf-8", errors="replace").read()
+          if "</head>" not in h:
+              erreur(os.path.basename(src) + " ne ressemble pas à une page HTML complète (balise </head> absente).")
           h = re.sub(r'<script src="[^"]*qrcode[^"]*"></script>', '<script src="lib/qrcode.min.js"></script>', h)
           h = re.sub(r'<script src="[^"]*jsqr[^"]*"></script>', '<script src="lib/jsQR.js"></script>', h, flags=re.I)
           demo = {}
           for p in sorted(glob.glob(os.path.join(racine, "**", "demo-*.json"), recursive=True)):
-              if "/android/" in p: continue
-              demo[os.path.basename(p)[:-5]] = json.load(open(p, encoding="utf-8"))
-          adapt = open(os.path.join(racine, "android/outils/adaptateur.js"), encoding="utf-8").read()
-          m = re.search(r"<script>\s*\(function\(\)\{", h)
-          if not m or "TRANSDOC_AUTONOME" in h:
-              sys.exit("Format de transdoc.html inattendu : utilisez le fichier transdoc.html fourni par Claude.")
-          inj = "<script>window.TRANSDOC_DEMO=" + json.dumps(demo, ensure_ascii=False, separators=(",", ":")) + ";</script>\n<script>\n" + adapt + "</script>\n"
-          h = h[:m.start()] + inj + h[m.start():]
+              if os.sep + "android" + os.sep in p:
+                  continue
+              try:
+                  demo[os.path.basename(p)[:-5]] = json.load(open(p, encoding="utf-8"))
+              except Exception as e:
+                  print("::warning title=TransDoc::" + os.path.basename(p) + " ignoré : " + str(e))
+          if "TRANSDOC_AUTONOME" not in h:
+              adapt = open(os.path.join(racine, "android/outils/adaptateur.js"), encoding="utf-8").read()
+              inj = "<script>window.TRANSDOC_DEMO=" + json.dumps(demo, ensure_ascii=False, separators=(",", ":")) + ";</script>\n<script>\n" + adapt + "</script>\n"
+              i = h.index("</head>")
+              h = h[:i] + inj + h[i:]
           os.makedirs(os.path.join(racine, "android/app/src/main/assets/lib"), exist_ok=True)
           open(os.path.join(racine, "android/app/src/main/assets/index.html"), "w", encoding="utf-8").write(h)
-          print("index.html généré depuis", os.path.relpath(src, racine), "avec", sum(len(d["vehicules"]) for d in demo.values()), "véhicules de démonstration")
+          print("index.html généré depuis", os.path.relpath(src, racine), "avec", sum(len(d.get("vehicules", {})) for d in demo.values()), "véhicules de démonstration")
           FIN_FICHIER
           python3 android/outils/construire_index.py
 
-      - name: Télécharger les bibliothèques QR (utilisables hors ligne)
+      - name: Vérifier le SDK Android (préinstallé sur les machines GitHub)
+        shell: bash
         run: |
-          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js -o android/app/src/main/assets/lib/qrcode.min.js
-          curl -fsSL https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js -o android/app/src/main/assets/lib/jsQR.js
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then echo "::error title=TransDoc::SDK Android introuvable sur la machine GitHub"; exit 1; fi
+          echo "sdk.dir=$SDK" > android/local.properties
+          echo "SDK Android : $SDK"
+          ls "$SDK/platforms" || true
+
+      - name: Installer Gradle 8.9
+        shell: bash
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o "$RUNNER_TEMP/gradle.zip" || { echo "::error title=TransDoc::Téléchargement de Gradle impossible"; exit 1; }
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Télécharger les bibliothèques QR (utilisables hors ligne)
+        shell: bash
+        run: |
+          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js -o android/app/src/main/assets/lib/qrcode.min.js || echo "::warning title=TransDoc::qrcode.min.js non téléchargé"
+          curl -fsSL https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js -o android/app/src/main/assets/lib/jsQR.js || echo "::warning title=TransDoc::jsQR.js non téléchargé"
 
       - name: Préparer la clé de signature officielle (facultatif)
         if: env.KEYSTORE_B64 != ''
+        shell: bash
         run: |
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/transdoc.jks"
           echo "TRANSDOC_KEYSTORE=$RUNNER_TEMP/transdoc.jks" >> "$GITHUB_ENV"
 
       - name: Compiler l'APK
+        shell: bash
         env:
           TRANSDOC_KEYSTORE_PASSWORD: ${{ secrets.TRANSDOC_KEYSTORE_PASSWORD }}
           TRANSDOC_KEY_ALIAS: ${{ secrets.TRANSDOC_KEY_ALIAS }}
           TRANSDOC_KEY_PASSWORD: ${{ secrets.TRANSDOC_KEY_PASSWORD }}
         run: |
-          gradle -p android :app:assembleRelease --no-daemon --stacktrace
+          set -o pipefail
+          if ! gradle -p android :app:assembleRelease --no-daemon 2>&1 | tee gradle.log; then
+            MSG=$(grep -A8 "What went wrong" gradle.log | tr '\n' ' ' | cut -c1-900)
+            echo "::error title=Compilation Gradle::${MSG:-voir le journal de l'étape Compiler l'APK}"
+            exit 1
+          fi
           cp android/app/build/outputs/apk/release/app-release.apk TransDoc.apk
 
       - name: Mettre l'APK à disposition
