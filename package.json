@@ -1,0 +1,13 @@
+{
+  "name": "transdoc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TransDoc Gabon — registre national des documents de transport",
+  "scripts": {
+    "test:db": "node --test tests/db.test.js",
+    "seed": "node scripts/seed-demo.js"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
+}
