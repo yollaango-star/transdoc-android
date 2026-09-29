@@ -467,6 +467,7 @@ jobs:
               erreur(os.path.basename(src) + " ne ressemble pas à une page HTML complète (balise </head> absente).")
           h = re.sub(r'<script src="[^"]*qrcode[^"]*"></script>', '<script src="lib/qrcode.min.js"></script>', h)
           h = re.sub(r'<script src="[^"]*jsqr[^"]*"></script>', '<script src="lib/jsQR.js"></script>', h, flags=re.I)
+          h = re.sub(r'<script src="[^"]*supabase-js[^"]*"></script>', '<script src="lib/supabase.js"></script>', h)
           demo = {}
           for p in sorted(glob.glob(os.path.join(racine, "**", "demo-*.json"), recursive=True)):
               if os.sep + "android" + os.sep in p:
@@ -475,7 +476,8 @@ jobs:
                   demo[os.path.basename(p)[:-5]] = json.load(open(p, encoding="utf-8"))
               except Exception as e:
                   print("::warning title=TransDoc::" + os.path.basename(p) + " ignoré : " + str(e))
-          if "TRANSDOC_AUTONOME" not in h:
+          # Registre national (Supabase) configuré dans transdoc.html : pas d'adaptateur hors ligne.
+          if "TRANSDOC_AUTONOME" not in h and "TRANSDOC_SUPABASE" not in h:
               adapt = open(os.path.join(racine, "android/outils/adaptateur.js"), encoding="utf-8").read()
               inj = "<script>window.TRANSDOC_DEMO=" + json.dumps(demo, ensure_ascii=False, separators=(",", ":")) + ";</script>\n<script>\n" + adapt + "</script>\n"
               i = h.index("</head>")
@@ -507,6 +509,7 @@ jobs:
         run: |
           curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js -o android/app/src/main/assets/lib/qrcode.min.js || echo "::warning title=TransDoc::qrcode.min.js non téléchargé"
           curl -fsSL https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js -o android/app/src/main/assets/lib/jsQR.js || echo "::warning title=TransDoc::jsQR.js non téléchargé"
+          curl -fsSL https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js -o android/app/src/main/assets/lib/supabase.js || { echo "::error title=TransDoc::supabase.js non téléchargé (registre national inaccessible)"; exit 1; }
 
       - name: Préparer la clé de signature officielle (facultatif)
         if: env.KEYSTORE_B64 != ''

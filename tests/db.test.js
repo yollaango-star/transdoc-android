@@ -138,6 +138,19 @@ test('retrait du véhicule et suppression du compte', async () => {
   await user(P1, `delete from public.vehicles where plaque = 'ES1234A'`);
   assert.equal(await n(db.query(`select count(*)::int n from public.vehicle_documents where plaque = 'ES1234A'`)), 0);
   assert.equal(await n(db.query(`select count(*)::int n from public.controles where plaque = 'ES1234A'`)), 1); // historique conservé
-  await db.exec(`delete from auth.users where id = '${P1}'`);
-  assert.equal(await n(db.query(`select count(*)::int n from public.profiles where id = '${P1}'`)), 0);
+  // Suppression du compte : ses véhicules partent avec lui, la plaque redevient libre
+  await user(P2, INSCRIRE, ['WN4242C', 'WN-4242-C', P2]);
+  await rejects(as('anon', null, 'select public.supprimer_mon_compte()'), /permission denied/);
+  await user(P2, 'select public.supprimer_mon_compte()');
+  assert.equal(await n(db.query(`select count(*)::int n from public.vehicles where plaque = 'WN4242C'`)), 0);
+  assert.equal(await n(db.query(`select count(*)::int n from auth.users where id = '${P2}'`)), 0);
+  assert.equal(await n(db.query(`select count(*)::int n from public.vehicles where demo`)), 164); // la démo n'est pas touchée
+});
+
+test('clé de signature des QR : inaccessible aux applications', async () => {
+  await as('service_role', null, `insert into public.qr_cles (id, kid, prive, publique) values (1, 'k1', '{"d":"secret"}', '{"x":"pub"}')`);
+  await rejects(user(AD, 'select * from public.qr_cles'), /permission denied/);
+  await rejects(as('anon', null, 'select * from public.qr_cles'), /permission denied/);
+  await rejects(as('service_role', null, `insert into public.qr_cles (id, kid, prive, publique) values (2, 'k2', '{}', '{}')`), /check constraint/);
+  assert.equal((await one(as('service_role', null, 'select kid from public.qr_cles'))).kid, 'k1');
 });
