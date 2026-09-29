@@ -2,7 +2,9 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0E5A3A">
+<meta name="color-scheme" content="light dark">
 <title>TransDoc Gabon</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,6 +17,8 @@
   --fond:#F3F6F1; --surface:#FFFFFF; --encre:#13201A; --doux:#5A6B61; --trait:#D9E2DA;
   --ok:#1C7A4A; --ok-bg:#E3F3E9; --warn:#9A6A00; --warn-bg:#FDF1CF; --ko:#B3372B; --ko-bg:#FBE4E1;
   --plaque:#FFFFFF; --plaque-trait:#13201A;
+  --entete:#0E5A3A; --sur-foret:#FFFFFF;
+  --ease-out:cubic-bezier(.23,1,.32,1); --ease-drawer:cubic-bezier(.32,.72,0,1);
   box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
   color-scheme:light;
 }
@@ -23,35 +27,44 @@
   --fond:#0F1713; --surface:#18231D; --encre:#E7EFE9; --doux:#9DB0A5; --trait:#2A3A31;
   --ok:#6FD39C; --ok-bg:#16301F; --warn:#F2C45A; --warn-bg:#352A0E; --ko:#F08A7E; --ko-bg:#3A1A16;
   --plaque:#EEF2EE; --plaque-trait:#0F1713; color-scheme:dark;
+  --entete:#0C3A27; --sur-foret:#0B1A12;
 }}
 :root[data-theme="dark"]{
   --foret:#3FAE78; --foret-2:#2E8C5F; --soleil:#F5CE4F; --ocean:#6FA3E6;
   --fond:#0F1713; --surface:#18231D; --encre:#E7EFE9; --doux:#9DB0A5; --trait:#2A3A31;
   --ok:#6FD39C; --ok-bg:#16301F; --warn:#F2C45A; --warn-bg:#352A0E; --ko:#F08A7E; --ko-bg:#3A1A16;
   --plaque:#EEF2EE; --plaque-trait:#0F1713; color-scheme:dark;
+  --entete:#0C3A27; --sur-foret:#0B1A12;
 }
 *,*::before,*::after{box-sizing:inherit}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;overscroll-behavior:none}
 body{margin:0;background:var(--fond);color:var(--encre);font:16px/1.55 "Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
 h1,h2,h3{font-family:"Bricolage Grotesque","Public Sans",system-ui,sans-serif;line-height:1.15;margin:0}
 button,input,select{font:inherit;color:inherit}
-:focus-visible{outline:3px solid var(--soleil);outline-offset:2px}
+button,a,label,select,summary{touch-action:manipulation}
+button,.btn,nav button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,select{font-size:1rem}
+:focus-visible{outline:3px solid var(--foret);outline-offset:2px}
+header :focus-visible{outline-color:var(--soleil)}
 .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
 
 /* En-tête : bande tricolore discrète */
-header{background:var(--foret);color:#fff;position:relative}
+header{background:var(--entete);color:#fff;position:relative}
 header::after{content:"";display:block;height:6px;background:linear-gradient(90deg,#1E8C4E 0 33.3%,#F2C230 33.3% 66.6%,#2260AE 66.6%)}
 .top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0}
 .logo{display:flex;align-items:center;gap:12px}
 .logo-mark{width:40px;height:40px;border-radius:10px;background:var(--soleil);color:#13201A;display:grid;place-items:center;font:800 20px "Bricolage Grotesque",sans-serif}
 .logo h1{font-size:1.45rem;font-weight:800;color:#fff}
 .logo small{display:block;font-size:.8rem;opacity:.8}
-.theme-btn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+.theme-btn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:10px;width:44px;height:44px;display:grid;place-items:center;padding:0;cursor:pointer;flex:none}
+.theme-btn svg{width:20px;height:20px}
 
-nav{display:flex;gap:4px;overflow-x:auto;padding-bottom:0}
-nav button{background:none;border:0;color:rgba(255,255,255,.78);padding:12px 14px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;font-weight:600}
+nav{display:flex;gap:4px;overflow-x:auto;padding-bottom:0;scrollbar-width:none;scroll-snap-type:x proximity;overscroll-behavior-x:contain}
+nav::-webkit-scrollbar{display:none}
+@media (max-width:760px){nav{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent);padding-right:24px}}
+nav button{background:none;border:0;color:rgba(255,255,255,.78);padding:12px 14px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;font-weight:600;scroll-snap-align:start;min-height:48px;transition:color .15s ease,border-color .15s ease}
 nav button[aria-selected="true"]{color:#fff;border-bottom-color:var(--soleil)}
-nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--soleil);color:#13201A;font-size:.75rem;text-align:center}
+nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--soleil);color:#13201A;font-size:.8125rem;text-align:center}
 
 main{padding:28px 0 60px}
 section[hidden]{display:none}
@@ -76,14 +89,16 @@ h2{font-size:1.7rem;font-weight:700}
 .docs{list-style:none;margin:0;padding:6px 18px 12px}
 .docs li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--trait);font-size:.95rem}
 .docs li:last-child{border-bottom:0}
-.pill{font-size:.78rem;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill{font-size:.8125rem;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
 .pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.ko{background:var(--ko-bg);color:var(--ko)}
 .v-actions{display:flex;gap:8px;padding:12px 18px 18px;margin-top:auto;flex-wrap:wrap}
 
-.btn{border:0;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer;background:var(--foret);color:#fff}
-.btn:hover{background:var(--foret-2)}
+.btn{border:0;border-radius:10px;padding:10px 16px;min-height:44px;font-weight:700;cursor:pointer;background:var(--foret);color:var(--sur-foret);transition:transform .14s var(--ease-out),background-color .2s ease,border-color .2s ease}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:disabled:active{transform:none}
+nav button:active{color:#fff}
 .btn.ghost{background:transparent;color:var(--encre);border:1px solid var(--trait)}
-.btn.ghost:hover{border-color:var(--doux)}
 .btn.jaune{background:var(--soleil);color:#13201A}
 .btn.danger{background:transparent;color:var(--ko);border:1px solid var(--trait)}
 
@@ -120,22 +135,36 @@ legend{font-weight:700;padding:0 6px}
 .alertes li.ko{border-left-color:var(--ko)}
 
 /* Modale */
-dialog{border:0;border-radius:16px;padding:0;background:var(--surface);color:var(--encre);width:min(640px,calc(100% - 24px));max-height:calc(100% - 40px)}
-dialog::backdrop{background:rgba(10,20,15,.55)}
+dialog{border:0;border-radius:16px;padding:0;background:var(--surface);color:var(--encre);width:min(640px,calc(100% - 24px));max-height:calc(100% - 40px);overscroll-behavior:contain;
+  transition:opacity .2s var(--ease-out),transform .2s var(--ease-out),overlay .2s allow-discrete,display .2s allow-discrete}
+dialog:not([open]){opacity:0;transform:scale(.97);transition-duration:.14s;transition-timing-function:ease-in}
+@starting-style{dialog[open]{opacity:0;transform:scale(.97)}}
+dialog::backdrop{background:rgba(10,20,15,.55);transition:background-color .2s ease,overlay .2s allow-discrete,display .2s allow-discrete}
+dialog:not([open])::backdrop{background:rgba(10,20,15,0)}
+@starting-style{dialog[open]::backdrop{background:rgba(10,20,15,0)}}
+@media (max-width:600px){
+  dialog{width:100%;max-width:100%;margin:auto 0 0;border-radius:20px 20px 0 0;max-height:92%;padding-bottom:env(safe-area-inset-bottom,0px);
+    transition:transform .32s var(--ease-drawer),opacity .2s ease,overlay .32s allow-discrete,display .32s allow-discrete}
+  dialog:not([open]){opacity:1;transform:translateY(100%);transition-duration:.2s;transition-timing-function:ease-in}
+  @starting-style{dialog[open]{opacity:1;transform:translateY(100%)}}
+  .d-foot{flex-wrap:wrap}.d-foot .btn{flex:1 1 auto}
+}
 .d-head{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--trait)}
-.d-body{padding:22px;overflow:auto}
+.d-body{padding:22px;overflow:auto;overscroll-behavior:contain}
 .d-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px;border-top:1px solid var(--trait)}
-.x{background:none;border:0;font-size:1.5rem;cursor:pointer;color:var(--doux)}
+.x{background:none;border:0;font-size:1.5rem;line-height:1;cursor:pointer;color:var(--doux);width:44px;height:44px;margin:-10px -12px -10px 0;border-radius:10px;display:grid;place-items:center;transition:transform .14s var(--ease-out)}
+.x:active{transform:scale(.9)}
 .qr-box{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
 #qr{background:#fff;padding:14px;border-radius:12px}
 .code{font:700 1.1rem "Bricolage Grotesque",sans-serif;letter-spacing:.12em}
 .pay{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
 .pay label{flex-direction:row;align-items:center;gap:10px;border:1px solid var(--trait);border-radius:10px;padding:12px;cursor:pointer}
+.pay label{min-height:48px;transition:border-color .15s ease,background-color .15s ease}
 .pay label:has(input:checked){border-color:var(--foret);background:var(--ok-bg)}
 .note{font-size:.85rem;color:var(--doux)}
 
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--encre);color:var(--fond);padding:12px 18px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
-.toast.on{opacity:1}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,8px);background:var(--encre);color:var(--fond);padding:12px 18px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;max-width:calc(100% - 32px);z-index:10;transition:opacity .15s ease-in,transform .15s ease-in}
+.toast.on{opacity:1;transform:translate(-50%,0);transition:opacity .24s var(--ease-out),transform .24s var(--ease-out)}
 /* Scanner */
 .scan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .viseur{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:1/1;max-width:420px;margin:0 auto}
@@ -174,7 +203,12 @@ td.hot{color:var(--ko);font-weight:700}
 footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);font-size:.85rem}
 
 @media (max-width:760px){ .controle{grid-template-columns:1fr} h2{font-size:1.45rem} .pay{grid-template-columns:1fr} }
-@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-property:opacity,color,background-color,border-color!important}
+  .toast,.toast.on{transform:translateX(-50%)!important}
+  dialog,dialog:not([open]){transform:none!important}
+  dialog:not([open]){opacity:0!important}
+}
 
 .role{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;background:rgba(255,255,255,.16);font-size:.78rem;font-weight:700;vertical-align:middle}
 .bandeau{margin:0 0 20px;padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--trait)}
@@ -185,6 +219,11 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
 .live{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;color:var(--doux)}
 .live::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
 .deux{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+
+@media (hover:hover) and (pointer:fine){
+  .btn:hover{background:var(--foret-2)}
+  .btn.ghost:hover{border-color:var(--doux)}
+}
 </style>
 </head>
 <body>
@@ -195,16 +234,16 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
         <div class="logo-mark" aria-hidden="true">T</div>
         <div><h1>TransDoc <span class="role" id="roleBadge" hidden></span></h1><small>Registre national des documents de transport · République Gabonaise</small></div>
       </div>
-      <button class="theme-btn" id="themeBtn" aria-label="Changer de thème">◐</button>
+      <button class="theme-btn" id="themeBtn" aria-label="Changer de thème"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
     </div>
     <nav role="tablist" id="nav">
-      <button role="tab" aria-selected="true" data-tab="vehicules">Mes véhicules</button>
-      <button role="tab" aria-selected="false" data-tab="alertes">Échéances<span class="count" id="nbAlertes">0</span></button>
-      <button role="tab" aria-selected="false" data-tab="controle" data-roles="agent admin" hidden>Contrôle routier</button>
-      <button role="tab" aria-selected="false" data-tab="stats" data-roles="agent admin" hidden>Tableau de bord</button>
-      <button role="tab" aria-selected="false" data-tab="agents" data-roles="admin" hidden>Agents</button>
-      <button role="tab" aria-selected="false" data-tab="profil">Mon compte</button>
-      <button role="tab" aria-selected="false" data-tab="apropos">À propos</button>
+      <button role="tab" aria-selected="true" data-tab="vehicules" aria-controls="vehicules">Mes véhicules</button>
+      <button role="tab" aria-selected="false" data-tab="alertes" aria-controls="alertes">Échéances<span class="count" id="nbAlertes">0</span></button>
+      <button role="tab" aria-selected="false" data-tab="controle" aria-controls="controle" data-roles="agent admin" hidden>Contrôle routier</button>
+      <button role="tab" aria-selected="false" data-tab="stats" aria-controls="stats" data-roles="agent admin" hidden>Tableau de bord</button>
+      <button role="tab" aria-selected="false" data-tab="agents" aria-controls="agents" data-roles="admin" hidden>Agents</button>
+      <button role="tab" aria-selected="false" data-tab="profil" aria-controls="profil">Mon compte</button>
+      <button role="tab" aria-selected="false" data-tab="apropos" aria-controls="apropos">À propos</button>
     </nav>
   </div>
 </header>
@@ -213,7 +252,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   <div class="bandeau" id="bandeau">Connexion au registre national…</div>
 
   <!-- MES VÉHICULES -->
-  <section id="vehicules">
+  <section role="tabpanel" id="vehicules">
     <div class="toolbar">
       <div>
         <h2>Mes véhicules</h2>
@@ -225,21 +264,21 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   </section>
 
   <!-- ALERTES -->
-  <section id="alertes" hidden>
+  <section role="tabpanel" id="alertes" hidden>
     <h2>Échéances</h2>
     <p class="lede">Pièces expirées ou qui expirent dans les 30 prochains jours. Renouvelez-les avant de prendre la route.</p>
     <ul class="alertes" id="listeAlertes"></ul>
   </section>
 
   <!-- CONTRÔLE -->
-  <section id="controle" hidden>
+  <section role="tabpanel" id="controle" hidden>
     <h2>Contrôle routier</h2>
     <p class="lede">Scannez le code QR du conducteur ou saisissez l'immatriculation. La recherche porte sur tout le registre national et chaque contrôle est enregistré à votre nom.</p>
     <div class="controle">
       <div class="panel">
         <label for="q">Immatriculation ou code TD</label>
         <div class="search" style="margin-top:6px">
-          <input id="q" placeholder="Ex. ES-2471-A" autocomplete="off">
+          <input id="q" placeholder="Ex. ES-2471-A" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="search">
           <button class="btn" id="verifBtn">Vérifier</button>
         </div>
         <div class="scan-actions">
@@ -257,7 +296,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   </section>
 
   <!-- TABLEAU DE BORD -->
-  <section id="stats" hidden>
+  <section role="tabpanel" id="stats" hidden>
     <div class="toolbar">
       <div>
         <h2>Tableau de bord par province</h2>
@@ -291,13 +330,13 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   </section>
 
   <!-- AGENTS -->
-  <section id="agents" hidden>
+  <section role="tabpanel" id="agents" hidden>
     <h2>Agents de contrôle</h2>
     <p class="lede">Habilitez les agents de la Police, de la Gendarmerie et de la DGTT. Un agent habilité accède au contrôle routier et au tableau de bord.</p>
     <div class="deux">
       <div class="panel">
         <label>Rechercher une personne de l'organisation
-          <input id="agentQ" placeholder="Nom ou adresse e-mail" autocomplete="off">
+          <input id="agentQ" placeholder="Nom ou adresse e-mail" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
         </label>
         <ul class="personnes" id="agentHits"></ul>
       </div>
@@ -309,13 +348,13 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   </section>
 
   <!-- MON COMPTE -->
-  <section id="profil" hidden>
+  <section role="tabpanel" id="profil" hidden>
     <h2>Mon compte</h2>
     <p class="lede">Vos coordonnées restent privées : ni les agents ni l'administration ne voient votre numéro dans cette application.</p>
     <div class="deux">
       <form class="panel form" id="profilForm">
         <label class="full">Nom et prénom<input name="nom" required placeholder="Nom et prénom"></label>
-        <label class="full">Téléphone pour les rappels<input name="tel" type="tel" placeholder="+241 07 00 00 00"></label>
+        <label class="full">Téléphone pour les rappels<input name="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="+241 07 00 00 00"></label>
         <label class="check full" style="flex-direction:row;align-items:center;gap:8px;font-weight:500"><input type="checkbox" name="sms"> Recevoir les rappels par SMS avant chaque échéance</label>
         <div class="full"><button class="btn" type="submit">Enregistrer mon compte</button></div>
       </form>
@@ -330,7 +369,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   </section>
 
   <!-- À PROPOS -->
-  <section id="apropos" hidden>
+  <section role="tabpanel" id="apropos" hidden>
     <h2>À propos de TransDoc</h2>
     <div class="panel" style="max-width:70ch;margin-top:18px">
       <p style="margin-top:0">TransDoc dématérialise le suivi de conformité des véhicules au Gabon, sur le modèle de la plateforme SÉCUROUTE mise en place au Bénin. Chaque véhicule dispose d'un code QR unique que les forces de l'ordre scannent pour vérifier ses pièces en quelques secondes.</p>
@@ -351,7 +390,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
     <div class="d-head"><h3 id="formTitre">Ajouter un véhicule</h3><button type="button" class="x" data-close aria-label="Fermer">×</button></div>
     <div class="d-body">
       <div class="form">
-        <label>Immatriculation<input name="plaque" required placeholder="ES-1234-A"></label>
+        <label>Immatriculation<input name="plaque" required placeholder="ES-1234-A" autocapitalize="characters" autocorrect="off" spellcheck="false"></label>
         <label>Catégorie
           <select name="categorie"><option>Véhicule particulier</option><option>Taxi</option><option>Clando / transport en commun</option><option>Camion / poids lourd</option><option>Bus</option><option>Moto</option></select>
         </label>
@@ -363,7 +402,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
         </label>
         <fieldset class="full"><legend>Pièces</legend>
           <div class="form">
-            <label>N° carte grise<input name="cartegrise" required placeholder="CG-000000"></label>
+            <label>N° carte grise<input name="cartegrise" required placeholder="CG-000000" autocapitalize="characters" autocorrect="off" spellcheck="false"></label>
             <label>Assurance : expiration<input type="date" name="assurance" required></label>
             <label>Visite technique : expiration<input type="date" name="visite" required></label>
             <label>Vignette : expiration<input type="date" name="vignette" required></label>
@@ -393,7 +432,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
       <label><input type="radio" name="op" value="Airtel Money" checked> Airtel Money</label>
       <label><input type="radio" name="op" value="Moov Money"> Moov Money</label>
     </div>
-    <label>Numéro mobile money<input id="payTel" type="tel" placeholder="+241 07 00 00 00"></label>
+    <label>Numéro mobile money<input id="payTel" type="tel" inputmode="tel" autocomplete="tel" placeholder="+241 07 00 00 00"></label>
     <p class="note">Paiement simulé : aucun montant n'est débité. Avec le serveur TransDoc, vous validerez le paiement avec votre code secret sur votre téléphone.</p>
   </div>
   <div class="d-foot"><button class="btn ghost" data-close>Annuler</button><button class="btn" id="payBtn">Payer et renouveler</button></div>
@@ -538,9 +577,10 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
     document.querySelectorAll('nav [data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b));
     document.querySelectorAll('main section').forEach(s=>s.hidden=s.id!==b.dataset.tab);
     try{sessionStorage.setItem('transdoc.tab',b.dataset.tab)}catch(e){}
+    b.scrollIntoView({block:'nearest',inline:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
     if(b.dataset.tab==='stats') renderStats();
   });
-  $('#themeBtn').onclick=()=>{const r=document.documentElement,d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark'};
+  $('#themeBtn').onclick=()=>{const r=document.documentElement,d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark';const m=document.querySelector('meta[name=theme-color]');if(m)m.content=d?'#0E5A3A':'#0C3A27'};
   document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
   ['#fCat','#fTri','#fSim'].forEach(x=>$(x).addEventListener('change',renderStats));
   let tm; function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tm);tm=setTimeout(()=>t.classList.remove('on'),3000)}
