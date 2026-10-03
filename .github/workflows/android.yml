@@ -1,7 +1,8 @@
 # TransDoc — compilation automatique de l'APK Android.
 # Génère le projet Android à partir de transdoc.html et des demo-*.json du dépôt, puis compile TransDoc.apk.
 # Résultat : onglet Actions → dernière exécution → Artifacts → TransDoc-apk.
-# Les tests (registre et codes QR) passent avant toute compilation. Une version publiée (tag v*) exige :
+# Les tests (registre et codes QR) passent avant toute compilation, et seuls sur chaque pull request vers main.
+# Une version publiée (tag v*) exige :
 #   • les variables de dépôt TRANSDOC_SUPABASE_URL et TRANSDOC_SUPABASE_KEY du projet Supabase de PRODUCTION ;
 #   • les secrets TRANSDOC_KEYSTORE_* de la clé de signature officielle.
 name: Construire l'APK TransDoc
@@ -10,6 +11,8 @@ on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch: {}
 
 permissions:
@@ -42,6 +45,8 @@ jobs:
 
   apk:
     needs: tests
+    # Pull request : tests seulement, aucun APK compilé ni publié
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     env:
       KEYSTORE_B64: ${{ secrets.TRANSDOC_KEYSTORE_BASE64 }}
