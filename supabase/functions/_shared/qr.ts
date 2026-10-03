@@ -7,6 +7,8 @@
 
 export const ALGO = { name: 'ECDSA', namedCurve: 'P-256' } as const;
 export const SIGNATURE = { name: 'ECDSA', hash: 'SHA-256' } as const;
+// Au-delà, un QR authentique est signalé « périmé » : le propriétaire doit l'afficher à nouveau (signature récente).
+export const VALIDITE_SECONDES = 365 * 86400;
 
 export const message = (code: string, plaque: string, t: number) => ['TD2', code, plaque, String(t)].join('|');
 
@@ -34,3 +36,22 @@ export async function verifier(publique: CryptoKey, qr: { code: string; plaque: 
 }
 // Seule la partie publique quitte le serveur.
 export const partiePublique = (jwk: JsonWebKey) => ({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y });
+
+// Rotation : la clé active signe ; les clés retirées restent publiées le temps que leurs QR soient renouvelés.
+export type ClePublique = { kid: string; cle: JsonWebKey };
+export const cleDuKid = (active: ClePublique, retirees: ClePublique[], kid: string) =>
+  [active, ...retirees].find((c) => c.kid === kid) ?? null;
+export const perime = (t: number, maintenant = Date.now() / 1000) => maintenant - t > VALIDITE_SECONDES;
+
+// Secret QR_CLES_RETIREES : tableau JSON de clés publiques { kid, cle } ; toute valeur illisible est ignorée.
+export function lireRetirees(texte: string | undefined): ClePublique[] {
+  if (!texte) return [];
+  try {
+    const l = JSON.parse(texte);
+    return Array.isArray(l)
+      ? l.filter((c) => typeof c?.kid === 'string' && c?.cle?.x && c?.cle?.y).map((c) => ({ kid: c.kid, cle: partiePublique(c.cle) }))
+      : [];
+  } catch {
+    return [];
+  }
+}

@@ -1,0 +1,32 @@
+# TransDoc — surveillance du registre national : toutes les 30 minutes, l'API et la fonction de signature des QR
+# doivent répondre. En cas d'échec, GitHub prévient par e-mail (paramètres de notification Actions du compte).
+# Variables de dépôt utilisées : TRANSDOC_SUPABASE_URL et TRANSDOC_SUPABASE_KEY (registre de production).
+name: Surveiller le registre TransDoc
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  disponibilite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      URL: ${{ vars.TRANSDOC_SUPABASE_URL }}
+      CLE: ${{ vars.TRANSDOC_SUPABASE_KEY }}
+    steps:
+      - name: Vérifier l'API et la fonction « qr »
+        shell: bash
+        run: |
+          if [ -z "$URL" ] || [ -z "$CLE" ]; then echo "::warning title=Surveillance inactive::variables TRANSDOC_SUPABASE_URL / TRANSDOC_SUPABASE_KEY non définies"; exit 0; fi
+          n=$(curl -fsS --max-time 20 -H "apikey: $CLE" "$URL/rest/v1/provinces?select=nom" | jq length) \
+            || { echo "::error title=Registre indisponible::l'API REST ne répond pas"; exit 1; }
+          [ "$n" = 9 ] || { echo "::error title=Registre anormal::$n provinces au lieu de 9"; exit 1; }
+          # Sans jeton de connexion, la fonction doit refuser l'appel (401) : elle est donc en service.
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -H "apikey: $CLE" "$URL/functions/v1/qr")
+          [ "$code" = 401 ] || { echo "::error title=Fonction qr anormale::code HTTP $code au lieu de 401"; exit 1; }
+          echo "Registre et fonction qr en service"

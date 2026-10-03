@@ -9,9 +9,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" integrity="sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
 <script>
 // Registre national TransDoc (Supabase). Valeurs de RECETTE (projet transdoc-test, Paris) : la compilation de l'APK les remplace
 // par celles de production (variables TRANSDOC_SUPABASE_URL / TRANSDOC_SUPABASE_KEY de la CI) et refuse de publier une version sans elles.
@@ -668,13 +668,17 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
     // Codes QR signés — même format que supabase/functions/_shared/qr.ts
     async function cleQR(){const {data,error}=await sb.functions.invoke('qr',{method:'GET'}); if(error) throw error; try{localStorage.setItem(CLE,JSON.stringify(data))}catch(e){} return data}
     const octets=s=>{const b=atob(s.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-s.length%4)%4));const o=new Uint8Array(b.length);for(let i=0;i<b.length;i++)o[i]=b.charCodeAt(i);return o};
+    // Clé active ou retirée (rotation) correspondant au kid du QR — même règle que cleDuKid() dans _shared/qr.ts
+    const cleDuKid=(k,kid)=>k?[{kid:k.kid,cle:k.cle},...(k.retirees||[])].find(c=>c.kid===kid)||null:null;
+    const VALIDITE_QR=365*86400;
     async function verifierQR(o){
       if(!o||o.v!==2||!o.sig) return 'non-signe';
       let k=null; try{k=JSON.parse(localStorage.getItem(CLE))}catch(e){}
-      if(!k||k.kid!==o.kid){try{k=await cleQR()}catch(e){}}
-      if(!k||k.kid!==o.kid) return 'inconnu';
-      try{const cle=await crypto.subtle.importKey('jwk',k.cle,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);
-        return await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},cle,octets(o.sig),new TextEncoder().encode(['TD2',o.code,o.plaque,String(o.t)].join('|')))?'authentique':'falsifie'}
+      if(!cleDuKid(k,o.kid)){try{k=await cleQR()}catch(e){}}
+      const c=cleDuKid(k,o.kid); if(!c) return 'inconnu';
+      try{const cle=await crypto.subtle.importKey('jwk',c.cle,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);
+        if(!await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},cle,octets(o.sig),new TextEncoder().encode(['TD2',o.code,o.plaque,String(o.t)].join('|')))) return 'falsifie';
+        return Date.now()/1000-Number(o.t)>VALIDITE_QR?'perime':'authentique'}
       catch(e){return 'falsifie'}
     }
     async function afficherQR(v){
@@ -684,13 +688,14 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
       catch(e){try{qr=JSON.parse(localStorage.getItem(cache))}catch(x){} if(!qr){$('#qr').innerHTML='<p class="note">Connexion nécessaire pour créer le code QR signé la première fois.</p>';return}}
       $('#qr').innerHTML=''; if(window.QRCode) new QRCode($('#qr'),{text:JSON.stringify(qr),width:220,height:220,correctLevel:QRCode.CorrectLevel.M}); else $('#qr').textContent='QR indisponible';
     }
-    const BADGE={authentique:['ok','✓ Code QR authentique, signé par TransDoc'],falsifie:['ko','⚠ Code QR falsifié : signature invalide'],'non-signe':['warn','Ancien code QR, non signé'],inconnu:['warn','Signature non vérifiable : connectez-vous une fois au réseau']};
+    const BADGE={authentique:['ok','✓ Code QR authentique, signé par TransDoc'],falsifie:['ko','⚠ Code QR falsifié : signature invalide'],'non-signe':['ko','⚠ Ancien code QR, non signé'],perime:['warn','Code QR authentique mais signé il y a plus d’un an'],inconnu:['warn','Signature non vérifiable : connectez-vous une fois au réseau']};
     async function controler(source){
       const saisie=$('#q').value.trim(), box=$('#verdict'), qr=source==='qr'?S.qrLu:null; S.qrLu=null;
       if(norm(saisie).length<4){box.className='verdict';box.innerHTML='<strong>Saisissez une immatriculation ou un code TD.</strong>';return}
       const auth=qr?await verifierQR(qr):null;
       const badge=auth?`<p class="pill ${BADGE[auth][0]}" style="display:inline-block;margin:0 0 10px">${BADGE[auth][1]}</p><br>`:'';
       if(auth==='falsifie'){box.className='verdict ko';box.innerHTML=badge+'<div class="big">Code QR refusé</div><p class="note">Ce code n’a pas été émis par TransDoc. Demandez les pièces physiques.</p>';return}
+      if(auth==='non-signe'){box.className='verdict ko';box.innerHTML=badge+'<div class="big">Code QR refusé</div><p class="note">Ancien code QR sans signature : demandez au propriétaire d’afficher son code QR depuis l’application à jour, ou saisissez l’immatriculation.</p>';return}
       box.className='verdict';box.innerHTML=badge+'<p class="note">Recherche dans le registre national…</p>';
       let r;
       try{r=await q(sb.rpc('controler',{p_saisie:saisie,p_source:source==='qr'?'qr':'saisie'}))}

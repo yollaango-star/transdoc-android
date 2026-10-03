@@ -1,0 +1,21 @@
+# TransDoc — configuration de la CLI Supabase (déploiement : supabase link, db push, functions deploy).
+# Les réglages [auth] valent pour le registre local ; ils documentent aussi ceux attendus en recette et en production
+# (à reporter dans le tableau de bord, ou par « supabase config push » après vérification).
+project_id = "transdoc"
+
+[db.seed]
+# Données de démonstration : registre local seulement (supabase db reset). Jamais en production.
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[auth]
+site_url = "https://appassets.androidplatform.net"
+# Profil anonyme ouvert au premier lancement ; il ne peut rien inscrire avant confirmation de l'e-mail.
+enable_anonymous_sign_ins = true
+minimum_password_length = 8
+
+[auth.email]
+enable_confirmations = true
+
+[functions.qr]
+verify_jwt = true
