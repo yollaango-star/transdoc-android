@@ -5,6 +5,8 @@
 # Une version publiée (tag v*) exige :
 #   • les variables de dépôt TRANSDOC_SUPABASE_URL et TRANSDOC_SUPABASE_KEY du projet Supabase de PRODUCTION ;
 #   • les secrets TRANSDOC_KEYSTORE_* de la clé de signature officielle.
+# Registre (job « registre ») : à chaque push sur main, migrations et fonction « qr » déployées sur la RECETTE ;
+# à chaque tag v*, sur la PRODUCTION. Sans SUPABASE_ACCESS_TOKEN ni référence de projet, le job ne déploie rien.
 name: Construire l'APK TransDoc
 
 on:
@@ -43,10 +45,50 @@ jobs:
       - name: Tests des codes QR signés
         run: deno test supabase/functions/_shared/
 
-  apk:
+  registre:
     needs: tests
-    # Pull request : tests seulement, aucun APK compilé ni publié
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.SUPABASE_DB_PASSWORD_PRODUCTION || secrets.SUPABASE_DB_PASSWORD_RECETTE }}
+      PROJET: ${{ startsWith(github.ref, 'refs/tags/v') && vars.SUPABASE_REF_PRODUCTION || vars.SUPABASE_REF_RECETTE }}
+      CIBLE: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'recette' }}
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v5
+
+      - name: Configuration du déploiement
+        id: config
+        shell: bash
+        run: |
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_DB_PASSWORD" ] && [ -n "$PROJET" ]; then
+            echo "pret=oui" >> "$GITHUB_OUTPUT"; echo "Registre de $CIBLE : $PROJET"
+          else
+            echo "pret=non" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Registre non déployé::$CIBLE non configurée (SUPABASE_ACCESS_TOKEN, mot de passe de la base, SUPABASE_REF_*). Déploiement manuel : docs/exploitation.md"
+          fi
+
+      - name: Installer la CLI Supabase
+        if: steps.config.outputs.pret == 'oui'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Appliquer les migrations (sans données de démonstration)
+        if: steps.config.outputs.pret == 'oui'
+        run: |
+          supabase link --project-ref "$PROJET" --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Déployer la fonction de signature des QR
+        if: steps.config.outputs.pret == 'oui'
+        run: supabase functions deploy qr --project-ref "$PROJET" --use-api
+
+  apk:
+    needs: [ tests, registre ]
+    # Pull request : tests seulement. Ailleurs : APK après les tests, et après le registre quand il a été déployé.
+    if: always() && github.event_name != 'pull_request' && needs.tests.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.registre.result)
     runs-on: ubuntu-24.04
     env:
       KEYSTORE_B64: ${{ secrets.TRANSDOC_KEYSTORE_BASE64 }}
@@ -118,8 +160,9 @@ jobs:
                   applicationId 'ga.transdoc.app'
                   minSdk 26          // Android 8.0 et plus
                   targetSdk 34
-                  versionCode 1
-                  versionName '1.0.0'
+                  // Croissant à chaque compilation (exigé pour toute mise à jour) ; nom = tag publié, sinon version de développement
+                  versionCode Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+                  versionName System.getenv('TRANSDOC_VERSION') ?: '1.0.0-dev'
               }
 
               signingConfigs {
@@ -135,7 +178,8 @@ jobs:
 
               buildTypes {
                   release {
-                      minifyEnabled false
+                      minifyEnabled true
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
                       signingConfig keystore ? signingConfigs.officielle : signingConfigs.debug
                   }
               }
@@ -161,7 +205,7 @@ jobs:
               <uses-feature android:name="android.hardware.camera" android:required="false" />
 
               <application
-                  android:allowBackup="true"
+                  android:allowBackup="false"
                   android:icon="@mipmap/ic_launcher"
                   android:roundIcon="@mipmap/ic_launcher_round"
                   android:label="@string/app_name"
@@ -511,9 +555,11 @@ jobs:
           h = open(src, encoding="utf-8", errors="replace").read()
           if "</head>" not in h:
               erreur(os.path.basename(src) + " ne ressemble pas à une page HTML complète (balise </head> absente).")
-          h = re.sub(r'<script src="[^"]*qrcode[^"]*"></script>', '<script src="lib/qrcode.min.js"></script>', h)
-          h = re.sub(r'<script src="[^"]*jsqr[^"]*"></script>', '<script src="lib/jsQR.js"></script>', h, flags=re.I)
-          h = re.sub(r'<script src="[^"]*supabase-js[^"]*"></script>', '<script src="lib/supabase.js"></script>', h)
+          h = re.sub(r'<script src="[^"]*qrcode[^"]*"[^>]*></script>', '<script src="lib/qrcode.min.js"></script>', h)
+          h = re.sub(r'<script src="[^"]*jsqr[^"]*"[^>]*></script>', '<script src="lib/jsQR.js"></script>', h, flags=re.I)
+          h = re.sub(r'<script src="[^"]*supabase-js[^"]*"[^>]*></script>', '<script src="lib/supabase.js"></script>', h)
+          if re.search(r'<script src="https?://', h):
+              erreur("une bibliothèque externe reste chargée depuis Internet dans index.html")
           # Registre de production : remplace la configuration de recette écrite dans transdoc.html
           url, cle = os.environ.get("TRANSDOC_SUPABASE_URL", ""), os.environ.get("TRANSDOC_SUPABASE_KEY", "")
           if url and cle:
@@ -560,12 +606,20 @@ jobs:
           unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/gradle-8.9/bin" >> "$GITHUB_PATH"
 
-      - name: Télécharger les bibliothèques QR (utilisables hors ligne)
+      - name: Télécharger les bibliothèques (embarquées, utilisables hors ligne)
         shell: bash
         run: |
-          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js -o android/app/src/main/assets/lib/qrcode.min.js || echo "::warning title=TransDoc::qrcode.min.js non téléchargé"
-          curl -fsSL https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js -o android/app/src/main/assets/lib/jsQR.js || echo "::warning title=TransDoc::jsQR.js non téléchargé"
-          curl -fsSL https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js -o android/app/src/main/assets/lib/supabase.js || { echo "::error title=TransDoc::supabase.js non téléchargé (registre national inaccessible)"; exit 1; }
+          # Empreintes SHA-256 attendues : les mêmes fichiers que les attributs integrity de transdoc.html
+          set -euo pipefail
+          L=android/app/src/main/assets/lib
+          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js -o $L/qrcode.min.js
+          curl -fsSL https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js -o $L/jsQR.js
+          curl -fsSL https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js -o $L/supabase.js
+          sha256sum -c - <<'FIN_EMPREINTES' || { echo "::error title=TransDoc::bibliothèque modifiée ou incomplète (empreinte SHA-256 différente)"; exit 1; }
+          c541ef06327885a8415bca8df6071e14189b4855336def4f36db54bde8484f36  android/app/src/main/assets/lib/qrcode.min.js
+          bc40c8a15196236b2314db0856f72ca0b49980cd5413b8c852a7349f5fee0859  android/app/src/main/assets/lib/jsQR.js
+          59d39487c3589843b410322d8a3d562ce022aba1e5ccb16898ef3fb2a0da2ecd  android/app/src/main/assets/lib/supabase.js
+          FIN_EMPREINTES
 
       - name: Préparer la clé de signature officielle (facultatif)
         if: env.KEYSTORE_B64 != ''
@@ -582,6 +636,8 @@ jobs:
           TRANSDOC_KEY_PASSWORD: ${{ secrets.TRANSDOC_KEY_PASSWORD }}
         run: |
           set -o pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then export TRANSDOC_VERSION="${GITHUB_REF_NAME#v}"; else export TRANSDOC_VERSION="1.0.0-dev.$GITHUB_RUN_NUMBER"; fi
+          echo "Version $TRANSDOC_VERSION (code $GITHUB_RUN_NUMBER)"
           if ! gradle -p android :app:assembleRelease --no-daemon 2>&1 | tee gradle.log; then
             MSG=$(grep -A8 "What went wrong" gradle.log | tr '\n' ' ' | cut -c1-900)
             echo "::error title=Compilation Gradle::${MSG:-voir le journal de l'étape Compiler l'APK}"
