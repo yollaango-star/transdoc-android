@@ -200,3 +200,23 @@ test('OPS-2 : la démonstration ne peut pas occuper une vraie plaque', async () 
   await rejects(db.query(`insert into public.vehicles (plaque, plaque_affichee, categorie, marque, titulaire, province, carte_grise, demo)
     values ('ES4242Z', 'ES-4242-Z', 'Taxi', 'Kia', 'Démo', 'Estuaire', 'CG-1', true)`), /vehicles_demo_prefixe/);
 });
+
+test('DEV-3 : le journal des contrôles survit au compte de l’agent', async () => {
+  const avant = await n(db.query(`select count(*)::int n from public.controles where agent_id = '${AG}'`));
+  const total = (await one(user(AD, 'select public.stats_controles() s'))).s.total;
+  assert.ok(avant >= 3);
+  await user(AG, 'select public.supprimer_mon_compte()');
+  assert.equal(await n(db.query(`select count(*)::int n from auth.users where id = '${AG}'`)), 0);
+  assert.equal(await n(db.query(`select count(*)::int n from public.controles where agent_id is null`)), avant);
+  assert.equal((await one(user(AD, 'select public.stats_controles() s'))).s.total, total);
+});
+
+test('DEV-5 : échéances à la date de Libreville, recherche sans jokers', async () => {
+  const r = await one(db.query(`select private.aujourdhui() = (now() at time zone 'Africa/Libreville')::date ok,
+    private.etat_piece(private.aujourdhui()) j0, private.etat_piece(private.aujourdhui() - 1) hier, private.etat_piece(private.aujourdhui() + 31) loin`));
+  assert.deepEqual([r.ok, r.j0, r.hier, r.loin], [true, 'warn', 'ko', 'ok']);
+  await rejects(user(P1, 'select private.aujourdhui()'), /permission denied/);
+  assert.equal((await user(AD, `select * from public.admin_rechercher('%%')`)).rows.length, 0);
+  assert.equal((await user(AD, `select * from public.admin_rechercher('__')`)).rows.length, 0);
+  assert.deepEqual((await user(AD, `select email from public.admin_rechercher('dgtt')`)).rows.map(x => x.email), ['admin@dgtt.ga']);
+});
