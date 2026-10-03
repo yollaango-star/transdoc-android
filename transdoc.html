@@ -651,6 +651,9 @@ const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:
       if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Pas de connexion Internet. Réessayez dans un instant.";
       if(/Invalid login credentials/i.test(m)) return "E-mail ou mot de passe incorrect.";
       if(/Email not confirmed/i.test(m)) return "Confirmez d’abord votre e-mail avec le lien reçu.";
+      if(/token has expired|otp.*(expired|invalid)|invalid.*token/i.test(m)) return "Code invalide ou expiré. Demandez un nouveau code.";
+      if(/rate limit|you can only request this/i.test(m)) return "Trop de demandes rapprochées. Patientez quelques minutes avant de redemander un code.";
+      if(/should be different from the old password/i.test(m)) return "Choisissez un mot de passe différent de l’ancien.";
       return m};
     const q=async p=>{const {data,error}=await p; if(error) throw error; return data};
     const echec=e=>{console.error(e);toast(mess(e))};
@@ -780,6 +783,16 @@ const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:
     }
     async function definirRole(id,r,okMsg){try{await q(sb.rpc('admin_definir_role',{p_user:id,p_role:r}));toast(okMsg);$('#agentHits').innerHTML='';$('#agentQ').value='';await charger()}catch(e){echec(e)}}
     async function profil(f){try{await q(sb.from('profiles').update({nom:f.nom.value.trim(),tel:f.tel.value.trim(),sms:f.sms.checked}).eq('id',S.me));toast('Compte enregistré.');await charger()}catch(e){echec(e)}}
+    // Mot de passe oublié : un code reçu par e-mail (et non un lien, qui s'ouvrirait hors de l'application)
+    // ouvre une session de récupération, puis le nouveau mot de passe est enregistré. oubli = { email, envoye }.
+    let oubli=null;
+    const formOubli=()=>`<div class="panel" style="margin-top:14px;padding:16px" id="pOubli"><h4 style="margin:0 0 6px;font-size:1rem">Mot de passe oublié</h4>${!oubli.envoye
+      ?`<form id="fOubliEmail" class="form"><label class="full">E-mail du compte<input name="email" type="email" required autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(oubli.email||'')}"></label><div class="full" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Recevoir un code</button><button class="btn ghost" type="button" data-oubli-annuler>Annuler</button></div></form>`
+      :`<p class="note" style="margin-top:0">Si un compte existe pour <strong>${esc(oubli.email)}</strong>, un code vient de lui être envoyé par e-mail. Il est valable une heure.</p><form id="fOubliCode" class="form"><label>Code reçu<input name="code" inputmode="numeric" autocomplete="one-time-code" required pattern="[0-9]{6,10}" maxlength="10" placeholder="123456"></label><label>Nouveau mot de passe<input name="mdp" type="password" required minlength="8" autocomplete="new-password"></label><div class="full" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Changer le mot de passe</button><button class="btn ghost" type="button" id="bOubliRenvoi">Renvoyer un code</button><button class="btn ghost" type="button" data-oubli-annuler>Annuler</button></div></form>`}</div>`;
+    async function envoyerCodeOubli(email){
+      const r=await sb.auth.resetPasswordForEmail(email); if(r.error) throw r.error;
+      oubli={email,envoye:true}; toast('Code envoyé si le compte existe.'); renderCompte();
+    }
     function renderCompte(){
       const p=$('#comptePanel'); if(!p||!compte) return; p.hidden=false;
       const mdp=(()=>{try{return !!localStorage.getItem('transdoc.mdp.'+compte.id)}catch(e){return false}})();
@@ -787,13 +800,27 @@ const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:
       if(compte.anonyme&&!compte.enAttente) h+=`<form id="fSecuriser" class="form" style="margin-top:10px"><label class="full">Ajouter un e-mail pour retrouver mes véhicules sur un autre téléphone<input name="email" type="email" required autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="vous@exemple.ga"></label><div class="full"><button class="btn" type="submit">Recevoir le lien de confirmation</button></div></form>`;
       if(compte.enAttente) h+=`<p class="note">Lien envoyé à <strong>${esc(compte.enAttente)}</strong> : ouvrez-le pour confirmer (la page qui s'ouvre ensuite peut afficher une erreur, ce n'est pas grave), puis revenez ici.</p><button class="btn ghost" id="bConfirme" type="button">J’ai confirmé mon e-mail</button>`;
       if(!compte.anonyme&&!mdp) h+=`<form id="fMdp" class="form" style="margin-top:10px"><label class="full">Choisir un mot de passe pour vous reconnecter<input name="mdp" type="password" required minlength="8" autocomplete="new-password"></label><div class="full"><button class="btn" type="submit">Enregistrer le mot de passe</button></div></form>`;
-      h+=`<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">Agent ou administrateur : se connecter</summary><form id="fConnexion" class="form" style="margin-top:10px"><label class="full">E-mail<input name="email" type="email" required autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="full">Mot de passe<input name="mdp" type="password" required autocomplete="current-password"></label><div class="full"><button class="btn" type="submit">Se connecter</button></div>${compte.anonyme?'<p class="note full" style="margin:0">Les véhicules de ce profil anonyme ne seront plus accessibles après connexion à un autre compte : ajoutez d’abord un e-mail.</p>':''}</form></details>`;
+      h+=`<details style="margin-top:14px"${oubli?' open':''}><summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">Agent ou administrateur : se connecter</summary><form id="fConnexion" class="form" style="margin-top:10px"><label class="full">E-mail<input name="email" type="email" required autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="full">Mot de passe<input name="mdp" type="password" required autocomplete="current-password"></label><div class="full" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="btn" type="submit">Se connecter</button><button class="btn ghost" type="button" id="bOubli">Mot de passe oublié ?</button></div>${compte.anonyme?'<p class="note full" style="margin:0">Les véhicules de ce profil anonyme ne seront plus accessibles après connexion à un autre compte : ajoutez d’abord un e-mail.</p>':''}</form>${oubli?formOubli():''}</details>`;
       h+=`<div class="v-actions" style="padding:14px 0 0">${compte.anonyme?'':'<button class="btn ghost" id="bDeconnexion">Se déconnecter</button>'}<button class="btn danger" id="bSupprimer">Supprimer mon compte</button></div>`;
       p.innerHTML=h;
       $('#bConfirme')?.addEventListener('click',async()=>{await actualiserCompte(); if(compte.enAttente&&compte.anonyme) toast('Pas encore confirmé : ouvrez le lien reçu par e-mail, puis réessayez.')});
       $('#fSecuriser')?.addEventListener('submit',async e=>{e.preventDefault();const m=e.target.email.value.trim().toLowerCase();try{const r=await sb.auth.updateUser({email:m});if(r.error) throw r.error;compte.enAttente=m;toast('Lien de confirmation envoyé.');renderCompte()}catch(x){echec(x)}});
       $('#fMdp')?.addEventListener('submit',async e=>{e.preventDefault();try{const r=await sb.auth.updateUser({password:e.target.mdp.value});if(r.error) throw r.error;localStorage.setItem('transdoc.mdp.'+compte.id,'1');toast('Mot de passe enregistré.');renderCompte()}catch(x){echec(x)}});
       $('#fConnexion')?.addEventListener('submit',async e=>{e.preventDefault();try{const r=await sb.auth.signInWithPassword({email:e.target.email.value.trim().toLowerCase(),password:e.target.mdp.value});if(r.error) throw r.error;try{localStorage.setItem('transdoc.mdp.'+r.data.user.id,'1')}catch(x){}compte=infos(r.data.user);S.me=r.data.user.id;toast('Connecté.');await charger()}catch(x){echec(x)}});
+      $('#bOubli')?.addEventListener('click',()=>{oubli={email:p.querySelector('#fConnexion [name=email]').value.trim().toLowerCase(),envoye:false};renderCompte();$('#fOubliEmail [name=email]')?.focus()});
+      p.querySelectorAll('[data-oubli-annuler]').forEach(b=>b.addEventListener('click',()=>{oubli=null;renderCompte()}));
+      $('#fOubliEmail')?.addEventListener('submit',async e=>{e.preventDefault();const b=e.target.querySelector('button[type=submit]');b.disabled=true;
+        try{await envoyerCodeOubli(e.target.email.value.trim().toLowerCase())}catch(x){b.disabled=false;echec(x)}});
+      $('#bOubliRenvoi')?.addEventListener('click',async e=>{e.target.disabled=true;try{await envoyerCodeOubli(oubli.email)}catch(x){e.target.disabled=false;echec(x)}});
+      $('#fOubliCode')?.addEventListener('submit',async e=>{e.preventDefault();const b=e.target.querySelector('button[type=submit]');b.disabled=true;
+        const email=oubli.email, code=e.target.code.value.trim(), mdpNouveau=e.target.mdp.value;
+        try{
+          const v=await sb.auth.verifyOtp({email,token:code,type:'recovery'}); if(v.error) throw v.error;
+          const u=await sb.auth.updateUser({password:mdpNouveau}); if(u.error) throw u.error;
+          const user=u.data?.user||v.data?.user; oubli=null;
+          try{localStorage.setItem('transdoc.mdp.'+user.id,'1')}catch(x){}
+          compte=infos(user); S.me=user.id; toast('Mot de passe changé. Vous êtes connecté.'); await charger();
+        }catch(x){b.disabled=false;echec(x)}});
       $('#bDeconnexion')?.addEventListener('click',async()=>{await sb.auth.signOut();location.reload()});
       $('#bSupprimer')?.addEventListener('click',async()=>{if(!confirm('Supprimer définitivement votre compte et retirer vos véhicules du registre ?')) return;try{await q(sb.rpc('supprimer_mon_compte'));await sb.auth.signOut({scope:'local'});location.reload()}catch(x){echec(x)}});
     }

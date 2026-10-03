@@ -51,6 +51,8 @@ Une ligne en échec avec la gravité « Bloquante » interdit la mise en product
 | R32 | Registre national | Administrateur : rechercher par plaque, code TD et titulaire ; filtrer par province et « pièces à vérifier » | Résultats exacts ; démonstration exclue par défaut | Majeure | | |
 | R33 | Vérification d'une pièce | Administrateur : « Vérifier » sur une pièce déclarée, puis contrôle du véhicule par un agent | Pièce « vérifiée (admin) » ; verdict de l'agent recalculé (R12) | Bloquante | | |
 | R34 | Journal des contrôles | Administrateur : journal, filtres résultat et province | Contrôles de tous les agents, nom de l'agent, « Compte supprimé » pour un agent retiré | Majeure | | |
+| R35 | Mot de passe oublié | Mon compte → se connecter → « Mot de passe oublié ? », saisir l'e-mail d'un compte existant, puis le code reçu et un nouveau mot de passe | E-mail reçu avec un code (sans lien) ; connexion directe ; reconnexion possible avec le nouveau mot de passe, plus avec l'ancien | Bloquante | | |
+| R36 | Code erroné ou adresse inconnue | Saisir un mauvais code ; puis demander un code pour une adresse sans compte | « Code invalide ou expiré » ; pour l'adresse inconnue, même message de confirmation (aucune indication sur l'existence du compte) | Majeure | | |
 
 ## Procès-verbal
 
