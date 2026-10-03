@@ -35,10 +35,10 @@ Une ligne en échec avec la gravité « Bloquante » interdit la mise en product
 | R16 | QR falsifié | Modifier un caractère du contenu du QR, scanner | « Code QR refusé » | Bloquante | | |
 | R17 | Contrôle hors ligne | Agent en mode avion, scanner un QR | Authenticité affichée, message « état des pièces illisible sans connexion » | Majeure | | |
 | R18 | Caméra refusée | Refuser la permission caméra | Import d'une photo du QR proposé et fonctionnel | Majeure | | |
-| R19 | Accès réservés | Propriétaire : ouvrir contrôle / statistiques | Refus « Réservé aux agents » | Bloquante | | |
+| R19 | Accès réservés | Propriétaire : seuls « Mes véhicules », « Échéances », « Mon compte » et « À propos » sont proposés | Aucun onglet de contrôle ni d'administration | Bloquante | | |
 | R20 | Rôles | Administrateur : nommer puis retirer un agent | Droits appliqués au prochain lancement de l'agent | Bloquante | | |
 | R21 | Réclamation de plaque | Administrateur : `admin_reattribuer_vehicule` vers le vrai propriétaire | Véhicule transféré, pièces redevenues « déclarées » | Majeure | | |
-| R22 | Tableau de bord | Agent : statistiques, filtres catégorie et « démonstration » | Chiffres par province cohérents, aucune donnée personnelle | Majeure | | |
+| R22 | Tableau de bord | Administrateur : statistiques, filtres catégorie et « démonstration » | Chiffres par province cohérents, aucune donnée personnelle | Majeure | | |
 | R23 | Suppression du compte | Mon accès → Supprimer mon compte | Compte et véhicules supprimés, plaque de nouveau libre | Bloquante | | |
 | R24 | Retour Android | Ouvrir une fenêtre, appui sur Retour | La fenêtre se ferme, l'app reste ouverte | Mineure | | |
 | R25 | Rotation, mode sombre | Pivoter l'écran ; activer le thème sombre | Pas de perte de saisie, contrastes lisibles | Mineure | | |
@@ -46,6 +46,11 @@ Une ligne en échec avec la gravité « Bloquante » interdit la mise en product
 | R27 | QR non signé | Scanner un ancien QR sans signature (format v1) | « Code QR refusé », invitation à saisir la plaque | Bloquante | | |
 | R28 | Rotation de clé | En recette : rotation selon `docs/exploitation.md` §5, puis scanner un QR signé avec l'ancienne clé et un QR re-signé | Les deux « authentiques » ; après retrait de l'ancienne clé, l'ancien QR est « Signature non vérifiable » | Majeure | | |
 | R29 | Journal conservé | Supprimer le compte d'un agent ayant fait des contrôles | Tableau de bord : nombre total de contrôles inchangé | Majeure | | |
+| R30 | Espace contrôle | Se connecter avec un compte agent | Badge « Espace contrôle », ouverture sur « Contrôle routier » ; ni registre, ni tableau de bord, ni journal | Bloquante | | |
+| R31 | Espace administration | Se connecter avec un compte administrateur | Badge « Espace administration », ouverture sur « Registre national » ; onglets Tableau de bord, Journal des contrôles, Agents | Bloquante | | |
+| R32 | Registre national | Administrateur : rechercher par plaque, code TD et titulaire ; filtrer par province et « pièces à vérifier » | Résultats exacts ; démonstration exclue par défaut | Majeure | | |
+| R33 | Vérification d'une pièce | Administrateur : « Vérifier » sur une pièce déclarée, puis contrôle du véhicule par un agent | Pièce « vérifiée (admin) » ; verdict de l'agent recalculé (R12) | Bloquante | | |
+| R34 | Journal des contrôles | Administrateur : journal, filtres résultat et province | Contrôles de tous les agents, nom de l'agent, « Compte supprimé » pour un agent retiré | Majeure | | |
 
 ## Procès-verbal
 

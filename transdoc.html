@@ -206,6 +206,12 @@ th,td{padding:9px 6px;border-bottom:1px solid var(--trait);text-align:right;whit
 th:first-child,td:first-child{text-align:left}
 th{color:var(--doux);font-weight:600}
 td.hot{color:var(--ko);font-weight:700}
+table.journal th,table.journal td{text-align:left}
+.registre{display:grid;gap:14px}
+.registre .panel{padding:16px 18px}
+.registre .r-tete{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.registre .docs{padding:4px 0 0}
+.registre .docs .btn{padding:6px 12px;font-size:.875rem}
 @media (max-width:860px){ .dash-grid{grid-template-columns:1fr} .bar-row{grid-template-columns:110px minmax(0,1fr) 52px} }
 
 footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);font-size:.85rem}
@@ -245,11 +251,13 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
       <button class="theme-btn" id="themeBtn" aria-label="Changer de thème"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
     </div>
     <nav role="tablist" id="nav">
-      <button role="tab" aria-selected="true" data-tab="vehicules" aria-controls="vehicules">Mes véhicules</button>
-      <button role="tab" aria-selected="false" data-tab="alertes" aria-controls="alertes">Échéances<span class="count" id="nbAlertes">0</span></button>
-      <button role="tab" aria-selected="false" data-tab="controle" aria-controls="controle" data-roles="agent admin" hidden>Contrôle routier</button>
-      <button role="tab" aria-selected="false" data-tab="stats" aria-controls="stats" data-roles="agent admin" hidden>Tableau de bord</button>
-      <button role="tab" aria-selected="false" data-tab="agents" aria-controls="agents" data-roles="admin" hidden>Agents</button>
+      <button role="tab" aria-selected="true" data-tab="vehicules" aria-controls="vehicules" data-national="proprietaire">Mes véhicules</button>
+      <button role="tab" aria-selected="false" data-tab="alertes" aria-controls="alertes" data-national="proprietaire">Échéances<span class="count" id="nbAlertes">0</span></button>
+      <button role="tab" aria-selected="false" data-tab="controle" aria-controls="controle" data-roles="agent admin" data-national="agent" hidden>Contrôle routier</button>
+      <button role="tab" aria-selected="false" data-tab="registre" aria-controls="registre" data-roles="aucun" data-national="admin" hidden>Registre national</button>
+      <button role="tab" aria-selected="false" data-tab="stats" aria-controls="stats" data-roles="agent admin" data-national="admin" hidden>Tableau de bord</button>
+      <button role="tab" aria-selected="false" data-tab="journal" aria-controls="journal" data-roles="aucun" data-national="admin" hidden>Journal des contrôles</button>
+      <button role="tab" aria-selected="false" data-tab="agents" aria-controls="agents" data-roles="admin" data-national="admin" hidden>Agents</button>
       <button role="tab" aria-selected="false" data-tab="profil" aria-controls="profil">Mon compte</button>
       <button role="tab" aria-selected="false" data-tab="apropos" aria-controls="apropos">À propos</button>
     </nav>
@@ -303,6 +311,39 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
     </div>
   </section>
 
+  <!-- REGISTRE NATIONAL (administration) -->
+  <section role="tabpanel" id="registre" hidden>
+    <h2>Registre national</h2>
+    <p class="lede">Tous les véhicules inscrits. Recherchez par immatriculation, code TD ou titulaire, puis vérifiez les pièces déclarées après examen des justificatifs.</p>
+    <div class="filtres">
+      <label>Recherche
+        <input id="rQ" placeholder="Plaque, code TD ou titulaire" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="search">
+      </label>
+      <label>Province
+        <select id="rProv"><option value="">Toutes les provinces</option></select>
+      </label>
+      <label class="check"><input type="checkbox" id="rVerif"> Pièces à vérifier seulement</label>
+      <label class="check"><input type="checkbox" id="rDemo"> Inclure la démonstration</label>
+    </div>
+    <p class="note" id="rTotal" aria-live="polite"></p>
+    <div class="registre" id="rListe"></div>
+  </section>
+
+  <!-- JOURNAL DES CONTRÔLES (administration) -->
+  <section role="tabpanel" id="journal" hidden>
+    <h2>Journal des contrôles</h2>
+    <p class="lede">Tous les contrôles effectués par les agents, les plus récents en premier.</p>
+    <div class="filtres">
+      <label>Résultat
+        <select id="jRes"><option value="">Tous les résultats</option><option value="ok">Conforme</option><option value="warn">À renouveler</option><option value="non_verifie">Non vérifié</option><option value="ko">Non conforme</option><option value="introuvable">Introuvable</option></select>
+      </label>
+      <label>Province
+        <select id="jProv"><option value="">Toutes les provinces</option></select>
+      </label>
+    </div>
+    <div class="panel"><div class="table-wrap"><table id="jTab" class="journal"></table></div></div>
+  </section>
+
   <!-- TABLEAU DE BORD -->
   <section role="tabpanel" id="stats" hidden>
     <div class="toolbar">
@@ -340,7 +381,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   <!-- AGENTS -->
   <section role="tabpanel" id="agents" hidden>
     <h2>Agents de contrôle</h2>
-    <p class="lede">Habilitez les agents de la Police, de la Gendarmerie et de la DGTT. Un agent habilité accède au contrôle routier et au tableau de bord.</p>
+    <p class="lede">Habilitez les agents de la Police, de la Gendarmerie et de la DGTT. Un agent habilité accède au contrôle routier ; le registre, le journal des contrôles et le tableau de bord restent réservés à l'administration.</p>
     <div class="deux">
       <div class="panel">
         <label>Rechercher une personne de l'organisation
@@ -462,6 +503,8 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   const DOCS=[['assurance','Assurance',35000],['visite','Visite technique',25000],['vignette','Vignette',50000]];
   const PROVINCES=['Estuaire','Haut-Ogooué','Moyen-Ogooué','Ngounié','Nyanga','Ogooué-Ivindo','Ogooué-Lolo','Ogooué-Maritime','Woleu-Ntem'];
   const ROLES={admin:'Administrateur',agent:'Agent de contrôle',proprietaire:'Propriétaire'};
+const ESPACES={admin:'Espace administration',agent:'Espace contrôle',proprietaire:'Propriétaire'};
+const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:['warn','Non vérifié'],ko:['ko','Non conforme'],introuvable:['ko','Introuvable']};
   const $=s=>document.querySelector(s);
   const fmtDate=d=>new Date(d+'T00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
   const iso=d=>d.toISOString().slice(0,10);
@@ -507,11 +550,14 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   // ---------- Rendu ----------
   function bandeau(t,ko){const b=$('#bandeau');b.hidden=!t;b.className='bandeau'+(ko?' ko':'');b.textContent=t||''}
   function appliquerRole(){
-    const r=role(); $('#roleBadge').hidden=!S.pret; $('#roleBadge').textContent=ROLES[r];
-    document.querySelectorAll('nav [data-roles]').forEach(b=>{
-      const ok=b.dataset.roles.split(' ').includes(r); b.hidden=!ok;
-      if(!ok&&b.getAttribute('aria-selected')==='true') document.querySelector('[data-tab="vehicules"]').click();
+    const r=role(); $('#roleBadge').hidden=!S.pret; $('#roleBadge').textContent=REMOTE?ESPACES[r]:ROLES[r];
+    // Registre national : chaque rôle a son espace (data-national) ; sinon fonctionnement d'origine (data-roles).
+    document.querySelectorAll('nav [data-tab]').forEach(b=>{
+      const l=REMOTE&&b.dataset.national!==undefined?b.dataset.national:b.dataset.roles;
+      b.hidden=l!==undefined&&!l.split(' ').includes(r);
     });
+    const actif=document.querySelector('nav [aria-selected="true"]');
+    if(!actif||actif.hidden) document.querySelector('nav [data-tab]:not([hidden])')?.click();
     $('#addBtn').disabled=!S.pret||S.lecture||!S.me;
   }
   function renderListe(){
@@ -751,7 +797,42 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
       $('#bDeconnexion')?.addEventListener('click',async()=>{await sb.auth.signOut();location.reload()});
       $('#bSupprimer')?.addEventListener('click',async()=>{if(!confirm('Supprimer définitivement votre compte et retirer vos véhicules du registre ?')) return;try{await q(sb.rpc('supprimer_mon_compte'));await sb.auth.signOut({scope:'local'});location.reload()}catch(x){echec(x)}});
     }
-    return {demarrer,charger,enregistrer,retirer,afficherQR,controler,stats,renderAgents,chercher,definirRole,profil};
+    // Administration : registre complet, vérification des pièces, journal de tous les contrôles
+    let tRegistre=0;
+    async function registre(){
+      if($('#registre').hidden||!S.admin) return;
+      const n=++tRegistre;
+      try{
+        const r=await q(sb.rpc('admin_vehicules',{p_q:$('#rQ').value.trim()||null,p_province:$('#rProv').value||null,p_a_verifier:$('#rVerif').checked,p_demo:$('#rDemo').checked,p_limite:50}));
+        if(n!==tRegistre) return; // une recherche plus récente est en cours
+        $('#rTotal').textContent=r.total?`${r.total.toLocaleString('fr-FR')} véhicule${r.total>1?'s':''}${r.total>r.vehicules.length?` · ${r.vehicules.length} premiers affichés, précisez la recherche`:''}`:'';
+        const lib={ok:'Valide',warn:'À renouveler',ko:'Expirée'};
+        $('#rListe').innerHTML=r.vehicules.length?r.vehicules.map(v=>`<div class="panel">
+          <div class="r-tete">${plaqueHTML(v.plaque,true)}<span class="note">Code ${esc(v.code)}${v.demo?' · démonstration':''}</span></div>
+          <div class="note" style="margin-top:6px">${esc(v.marque)} ${esc(v.modele||'')} · ${esc(v.categorie)} · ${esc(v.titulaire)} · ${esc(v.province)} · carte grise ${esc(v.carte_grise)}</div>
+          <ul class="docs">${DOCS.map(([k,l])=>{const p=v.pieces[k];if(!p) return `<li><span>${l}</span><span class="pill ko">Manquante</span></li>`;
+            const ver=p.statut==='verifie';
+            return `<li><span>${l}<br><span class="note">jusqu'au ${fmtDate(p.expire_le)} · ${ver?'✓ vérifiée ('+esc(p.source)+')':'déclarée par le propriétaire'}</span></span><span style="display:flex;gap:8px;align-items:center"><span class="pill ${p.etat}">${lib[p.etat]}</span>${ver||v.demo?'':`<button class="btn" data-verifier="${esc(v.cle)}" data-piece="${k}">Vérifier</button>`}</span></li>`}).join('')}</ul>
+        </div>`).join(''):'<div class="empty">Aucun véhicule ne correspond à la recherche.</div>';
+      }catch(e){echec(e)}
+    }
+    async function verifierPiece(cle,piece,b){
+      const l=(DOCS.find(d=>d[0]===piece)||[])[1]||piece;
+      if(!confirm(`Confirmer la vérification de la pièce « ${l} » sur présentation du justificatif ?`)) return;
+      b.disabled=true;
+      try{await q(sb.from('vehicle_documents').update({statut:'verifie',source:'admin'}).eq('plaque',cle).eq('piece',piece).select('plaque'));toast('Pièce vérifiée.');await registre()}
+      catch(e){b.disabled=false;echec(e)}
+    }
+    async function journal(){
+      if($('#journal').hidden||!S.admin) return;
+      try{
+        const l=await q(sb.rpc('admin_controles',{p_resultat:$('#jRes').value||null,p_province:$('#jProv').value||null,p_limite:200}));
+        $('#jTab').innerHTML=l.length?`<thead><tr><th>Date</th><th>Agent</th><th>Saisie</th><th>Province</th><th>Moyen</th><th>Résultat</th></tr></thead><tbody>${l.map(c=>{const [cl,t]=RESULTATS[c.resultat]||['ko',c.resultat];
+          return `<tr><td>${new Date(c.le).toLocaleString('fr-FR')}</td><td>${esc(c.agent)}</td><td>${esc(c.saisie)}</td><td>${esc(c.province||'—')}</td><td>${c.source==='qr'?'QR':'Saisie'}</td><td><span class="pill ${cl}">${t}</span></td></tr>`}).join('')}</tbody>`
+          :'<tbody><tr><td class="note">Aucun contrôle enregistré pour ces critères.</td></tr></tbody>';
+      }catch(e){echec(e)}
+    }
+    return {demarrer,charger,enregistrer,retirer,afficherQR,controler,stats,renderAgents,chercher,definirRole,profil,registre,verifierPiece,journal};
   })():null;
 
   // ---------- Onglets, thème, modales ----------
@@ -761,7 +842,16 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
     try{sessionStorage.setItem('transdoc.tab',b.dataset.tab)}catch(e){}
     b.scrollIntoView({block:'nearest',inline:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
     if(b.dataset.tab==='stats') renderStats();
+    if(REMOTE&&b.dataset.tab==='registre') R.registre();
+    if(REMOTE&&b.dataset.tab==='journal') R.journal();
   });
+  ['#rProv','#jProv'].forEach(x=>PROVINCES.forEach(n=>{const o=document.createElement('option');o.textContent=n;$(x).append(o)}));
+  if(REMOTE){
+    let tq; $('#rQ').addEventListener('input',()=>{clearTimeout(tq);tq=setTimeout(R.registre,300)});
+    ['#rProv','#rVerif','#rDemo'].forEach(x=>$(x).addEventListener('change',R.registre));
+    ['#jRes','#jProv'].forEach(x=>$(x).addEventListener('change',R.journal));
+    $('#rListe').addEventListener('click',e=>{const b=e.target.closest('[data-verifier]'); if(b) R.verifierPiece(b.dataset.verifier,b.dataset.piece,b)});
+  }
   $('#themeBtn').onclick=()=>{const r=document.documentElement,d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark';const m=document.querySelector('meta[name=theme-color]');if(m)m.content=d?'#0E5A3A':'#0C3A27'};
   document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
   ['#fCat','#fTri','#fSim'].forEach(x=>$(x).addEventListener('change',renderStats));
