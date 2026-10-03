@@ -17,5 +17,11 @@ minimum_password_length = 8
 [auth.email]
 enable_confirmations = true
 
+# Mot de passe oublié : l'e-mail donne un code à saisir dans l'application (modèle à reporter dans le tableau de bord :
+# Authentication → Emails → Reset password, voir docs/exploitation.md).
+[auth.email.template.recovery]
+subject = "TransDoc : votre code pour changer de mot de passe"
+content_path = "./supabase/templates/recuperation.html"
+
 [functions.qr]
 verify_jwt = true
