@@ -9,17 +9,21 @@ const { PGlite } = require('@electric-sql/pglite');
 
 const SUPA = path.join(__dirname, '..', 'supabase');
 const P1 = '11111111-1111-4111-8111-111111111111'; // propriétaire
+const AN = '55555555-5555-4555-8555-555555555555'; // profil anonyme
 const P2 = '22222222-2222-4222-8222-222222222222'; // autre propriétaire
 const AG = '33333333-3333-4333-8333-333333333333'; // agent
 const AD = '44444444-4444-4444-8444-444444444444'; // administrateur
 
 let db;
-async function as(role, uid, sql, params) {
-  await db.exec(`set role ${role}; select set_config('request.jwt.claim.sub', '${uid || ''}', false);`);
+async function as(role, uid, sql, params, anonyme = false) {
+  const claims = uid ? JSON.stringify({ sub: uid, role, is_anonymous: anonyme }) : '';
+  await db.exec(`set role ${role}; select set_config('request.jwt.claim.sub', '${uid || ''}', false), set_config('request.jwt.claims', '${claims}', false);`);
   try { return await db.query(sql, params || []); }
-  finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`); }
+  finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false), set_config('request.jwt.claims', '', false);`); }
 }
 const user = (uid, sql, p) => as('authenticated', uid, sql, p);
+// Profil anonyme ouvert automatiquement par l'application : rôle authenticated, mais is_anonymous = true
+const anonyme = (uid, sql, p) => as('authenticated', uid, sql, p, true);
 const one = async p => (await p).rows[0];
 const n = async p => (await one(p)).n;
 const rejects = (p, re) => assert.rejects(p, re);
@@ -32,7 +36,7 @@ test.before(async () => {
   }
   await db.exec(fs.readFileSync(path.join(SUPA, 'seed.sql'), 'utf8'));
   // Comptes (Supabase Auth en production) : le profil « propriétaire » est créé automatiquement
-  await db.exec(`insert into auth.users (id, email) values ('${P1}', 'p1@exemple.ga'), ('${P2}', 'p2@exemple.ga'), ('${AG}', 'agent@police.ga'), ('${AD}', 'admin@dgtt.ga');
+  await db.exec(`insert into auth.users (id, email) values ('${P1}', 'p1@exemple.ga'), ('${P2}', 'p2@exemple.ga'), ('${AG}', 'agent@police.ga'), ('${AD}', 'admin@dgtt.ga'), ('${AN}', null);
     update public.profiles set role = 'admin', nom = 'Admin DGTT' where id = '${AD}';
     update public.profiles set nom = 'Agent Mba' where id = '${AG}';`);
 });
@@ -43,7 +47,7 @@ const INSCRIRE = `insert into public.vehicles (plaque, plaque_affichee, owner_id
 test('visiteur : aucun accès au registre', async () => {
   assert.equal(await n(as('anon', null, 'select count(*)::int n from public.provinces')), 9);
   await rejects(as('anon', null, 'select * from public.vehicles'), /permission denied/);
-  await rejects(as('anon', null, `select public.controler('ES9745B')`), /permission denied/);
+  await rejects(as('anon', null, `select public.controler('DEMOES9745B')`), /permission denied/);
 });
 
 test('propriétaire : inscrit son véhicule, ne voit que les siens, plaque unique', async () => {
@@ -67,7 +71,7 @@ test('pièces : le propriétaire déclare, seul le serveur ou l’administrateur
   assert.ok(s.rows.every(r => r.statut === 'declare' && r.source === 'proprietaire'), 'le téléphone ne peut pas se déclarer « vérifié »');
   await user(P1, `update public.vehicle_documents set statut = 'verifie' where plaque = 'ES1234A'`);
   assert.equal(await n(db.query(`select count(*)::int n from public.vehicle_documents where plaque = 'ES1234A' and statut = 'verifie'`)), 0);
-  await rejects(user(P2, `insert into public.vehicle_documents (plaque, piece, expire_le) values ('ES9745B', 'assurance', current_date + 999)`), /row-level security/);
+  await rejects(user(P2, `insert into public.vehicle_documents (plaque, piece, expire_le) values ('DEMOES9745B', 'assurance', current_date + 999)`), /row-level security/);
   // Le serveur (paiement confirmé) vérifie ; l'administrateur aussi
   await as('service_role', null, `update public.vehicle_documents set statut = 'verifie', source = 'paiement' where plaque = 'ES1234A' and piece = 'assurance'`);
   await user(AD, `update public.vehicle_documents set statut = 'verifie', source = 'admin' where plaque = 'ES1234A' and piece = 'visite'`);
@@ -79,15 +83,15 @@ test('pièces : le propriétaire déclare, seul le serveur ou l’administrateur
 });
 
 test('contrôle : réservé aux agents, toujours journalisé, par plaque ou par code', async () => {
-  await rejects(user(P1, `select public.controler('ES9745B')`), /Réservé aux agents/);
+  await rejects(user(P1, `select public.controler('DEMOES9745B')`), /Réservé aux agents/);
   await rejects(user(P1, `select * from public.stats_provinces()`), /Réservé aux agents/);
   await user(AD, `select public.admin_definir_role($1, 'agent')`, [AG]);
   const r = (await one(user(AG, `select public.controler('es-1234 a', 'saisie') r`))).r;
   assert.equal(r.trouve, true); assert.equal(r.resultat, 'ko'); // vignette expirée
   assert.equal(r.pieces.vignette.etat, 'ko'); assert.equal(r.toutes_verifiees, false);
-  const code = (await one(db.query(`select code from public.vehicles where plaque = 'ES9745B'`))).code;
+  const code = (await one(db.query(`select code from public.vehicles where plaque = 'DEMOES9745B'`))).code;
   const d = (await one(user(AG, `select public.controler($1, 'qr') r`, [code]))).r;
-  assert.equal(d.plaque, 'ES-9745-B'); assert.equal(d.toutes_verifiees, true);
+  assert.equal(d.plaque, 'DEMO-ES-9745-B'); assert.equal(d.toutes_verifiees, true);
   assert.equal((await one(user(AG, `select public.controler('XX0000Z') r`))).r.trouve, false);
   const c = await user(AG, `select resultat, source from public.controles order by created_at`);
   assert.deepEqual(c.rows.map(x => x.resultat + '/' + x.source), ['ko/saisie', d.resultat + '/qr', 'introuvable/saisie']);
@@ -119,7 +123,7 @@ test('administration : rôles attribués par un administrateur seulement', async
   assert.equal((await user(AD, 'select * from public.admin_agents()')).rows.length, 2);
   await rejects(user(P1, `select * from public.admin_rechercher('ga')`), /Réservé aux administrateurs/);
   await user(AD, `select public.admin_definir_role($1, 'proprietaire')`, [AG]);
-  await rejects(user(AG, `select public.controler('ES9745B')`), /Réservé aux agents/);
+  await rejects(user(AG, `select public.controler('DEMOES9745B')`), /Réservé aux agents/);
 });
 
 test('profil : chacun modifie ses coordonnées, personne ne lit celles des autres', async () => {
@@ -153,4 +157,46 @@ test('clé de signature des QR : inaccessible aux applications', async () => {
   await rejects(as('anon', null, 'select * from public.qr_cles'), /permission denied/);
   await rejects(as('service_role', null, `insert into public.qr_cles (id, kid, prive, publique) values (2, 'k2', '{}', '{}')`), /check constraint/);
   assert.equal((await one(as('service_role', null, 'select kid from public.qr_cles'))).kid, 'k1');
+});
+
+test('DEV-1 : un profil anonyme ne peut pas inscrire de véhicule', async () => {
+  await rejects(anonyme(AN, INSCRIRE, ['ES8080A', 'ES-8080-A', AN]), /row-level security/);
+  assert.equal(await n(db.query(`select count(*)::int n from public.vehicles where plaque = 'ES8080A'`)), 0);
+  // Une fois l'e-mail confirmé, le même compte inscrit son véhicule
+  await user(AN, INSCRIRE, ['ES8080A', 'ES-8080-A', AN]);
+  assert.equal(await n(db.query(`select count(*)::int n from public.vehicles where plaque = 'ES8080A'`)), 1);
+});
+
+test('DEV-1 : réclamation de plaque, réattribution par l’administration seulement', async () => {
+  await user(AN, `insert into public.vehicle_documents (plaque, piece, expire_le) values ('ES8080A', 'assurance', current_date + 100)`);
+  await db.query(`update public.vehicle_documents set statut = 'verifie' where plaque = 'ES8080A'`);
+  await rejects(user(P1, `select public.admin_reattribuer_vehicule('ES-8080-A', $1)`, [P1]), /Réservé aux administrateurs/);
+  await user(AD, `select public.admin_reattribuer_vehicule('ES-8080-A', $1)`, [P1]);
+  assert.equal(await n(user(AN, 'select count(*)::int n from public.vehicles')), 0);
+  assert.equal(await n(user(P1, `select count(*)::int n from public.vehicles where plaque = 'ES8080A'`)), 1);
+  assert.equal((await one(db.query(`select statut from public.vehicle_documents where plaque = 'ES8080A'`))).statut, 'declare');
+  await rejects(user(AD, `select public.admin_reattribuer_vehicule('DEMO-ES-9745-B', $1)`, [P1]), /Véhicule introuvable/);
+});
+
+test('DEV-2 : des pièces seulement déclarées ne sont jamais « conformes »', async () => {
+  await user(AD, `select public.admin_definir_role($1, 'agent')`, [AG]);
+  await user(P1, `insert into public.vehicle_documents (plaque, piece, expire_le) values
+    ('ES8080A', 'visite', current_date + 100), ('ES8080A', 'vignette', current_date + 100)`);
+  await user(P1, `update public.vehicle_documents set expire_le = current_date + 100 where plaque = 'ES8080A'`);
+  const r = (await one(user(AG, `select public.controler('ES8080A') r`))).r;
+  assert.equal(r.resultat, 'non_verifie'); assert.equal(r.toutes_verifiees, false);
+  // Vérifiées par le serveur : le même véhicule devient conforme
+  await as('service_role', null, `update public.vehicle_documents set statut = 'verifie', source = 'dgtt' where plaque = 'ES8080A'`);
+  assert.equal((await one(user(AG, `select public.controler('ES8080A') r`))).r.resultat, 'ok');
+  // Une pièce expirée l'emporte sur l'absence de vérification
+  await user(P1, `update public.vehicle_documents set expire_le = current_date - 1 where plaque = 'ES8080A' and piece = 'vignette'`);
+  assert.equal((await one(user(AG, `select public.controler('ES8080A') r`))).r.resultat, 'ko');
+  assert.equal((await one(user(AG, 'select public.stats_controles() s'))).s.non_verifies, 1);
+});
+
+test('OPS-2 : la démonstration ne peut pas occuper une vraie plaque', async () => {
+  assert.equal(await n(db.query(`select count(*)::int n from public.vehicles where demo and plaque !~ '^DEMO'`)), 0);
+  await rejects(user(P1, INSCRIRE, ['DEMO1234', 'DEMO-1234', P1]), /vehicles_demo_prefixe/);
+  await rejects(db.query(`insert into public.vehicles (plaque, plaque_affichee, categorie, marque, titulaire, province, carte_grise, demo)
+    values ('ES4242Z', 'ES-4242-Z', 'Taxi', 'Kia', 'Démo', 'Estuaire', 'CG-1', true)`), /vehicles_demo_prefixe/);
 });
