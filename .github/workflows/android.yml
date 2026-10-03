@@ -1,6 +1,9 @@
 # TransDoc — compilation automatique de l'APK Android.
 # Génère le projet Android à partir de transdoc.html et des demo-*.json du dépôt, puis compile TransDoc.apk.
 # Résultat : onglet Actions → dernière exécution → Artifacts → TransDoc-apk.
+# Les tests (registre et codes QR) passent avant toute compilation. Une version publiée (tag v*) exige :
+#   • les variables de dépôt TRANSDOC_SUPABASE_URL et TRANSDOC_SUPABASE_KEY du projet Supabase de PRODUCTION ;
+#   • les secrets TRANSDOC_KEYSTORE_* de la clé de signature officielle.
 name: Construire l'APK TransDoc
 
 on:
@@ -13,13 +16,51 @@ permissions:
   contents: write
 
 jobs:
-  apk:
+  tests:
     runs-on: ubuntu-24.04
-    env:
-      KEYSTORE_B64: ${{ secrets.TRANSDOC_KEYSTORE_BASE64 }}
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v5
+
+      - name: Installer Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Tests du registre (règles d'accès, contrôle, démonstration)
+        run: |
+          npm ci
+          npm run test:db
+
+      - name: Installer Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Tests des codes QR signés
+        run: deno test supabase/functions/_shared/
+
+  apk:
+    needs: tests
+    runs-on: ubuntu-24.04
+    env:
+      KEYSTORE_B64: ${{ secrets.TRANSDOC_KEYSTORE_BASE64 }}
+      TRANSDOC_SUPABASE_URL: ${{ vars.TRANSDOC_SUPABASE_URL }}
+      TRANSDOC_SUPABASE_KEY: ${{ vars.TRANSDOC_SUPABASE_KEY }}
+      PROJET_RECETTE: naobxnlcmeguqhfiiluz
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v5
+
+      - name: Garde-fous de publication (tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          ok=1
+          if [ -z "$KEYSTORE_B64" ]; then echo "::error title=Publication refusée::clé de signature officielle absente (secret TRANSDOC_KEYSTORE_BASE64)"; ok=0; fi
+          if [ -z "$TRANSDOC_SUPABASE_URL" ] || [ -z "$TRANSDOC_SUPABASE_KEY" ]; then echo "::error title=Publication refusée::variables TRANSDOC_SUPABASE_URL / TRANSDOC_SUPABASE_KEY du registre de production absentes"; ok=0; fi
+          case "$TRANSDOC_SUPABASE_URL" in *"$PROJET_RECETTE"*) echo "::error title=Publication refusée::TRANSDOC_SUPABASE_URL pointe sur le projet de recette transdoc-test"; ok=0;; esac
+          [ "$ok" = 1 ]
 
       - name: Installer Java 17
         uses: actions/setup-java@v5
@@ -468,6 +509,16 @@ jobs:
           h = re.sub(r'<script src="[^"]*qrcode[^"]*"></script>', '<script src="lib/qrcode.min.js"></script>', h)
           h = re.sub(r'<script src="[^"]*jsqr[^"]*"></script>', '<script src="lib/jsQR.js"></script>', h, flags=re.I)
           h = re.sub(r'<script src="[^"]*supabase-js[^"]*"></script>', '<script src="lib/supabase.js"></script>', h)
+          # Registre de production : remplace la configuration de recette écrite dans transdoc.html
+          url, cle = os.environ.get("TRANSDOC_SUPABASE_URL", ""), os.environ.get("TRANSDOC_SUPABASE_KEY", "")
+          if url and cle:
+              config = "window.TRANSDOC_SUPABASE = " + json.dumps({"url": url, "key": cle}) + ";"
+              h, n = re.subn(r"window\.TRANSDOC_SUPABASE = \{[^}]*\};", lambda m: config, h, count=1)
+              if n != 1:
+                  erreur("configuration window.TRANSDOC_SUPABASE introuvable dans " + os.path.basename(src))
+              print("Registre :", url)
+          else:
+              print("::warning title=TransDoc::registre de RECETTE (transdoc-test) : variables TRANSDOC_SUPABASE_URL / TRANSDOC_SUPABASE_KEY non définies")
           demo = {}
           for p in sorted(glob.glob(os.path.join(racine, "**", "demo-*.json"), recursive=True)):
               if os.sep + "android" + os.sep in p:

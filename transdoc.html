@@ -13,8 +13,10 @@
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
-// Registre national TransDoc (Supabase, projet transdoc-test, Paris). La clé « publishable » est publique par conception :
-// les droits sont décidés par les règles d’accès du serveur. Supprimer ces deux lignes rend l’application autonome (hors ligne).
+// Registre national TransDoc (Supabase). Valeurs de RECETTE (projet transdoc-test, Paris) : la compilation de l'APK les remplace
+// par celles de production (variables TRANSDOC_SUPABASE_URL / TRANSDOC_SUPABASE_KEY de la CI) et refuse de publier une version sans elles.
+// La clé « publishable » est publique par conception : les droits sont décidés par les règles d’accès du serveur.
+// Supprimer cette ligne rend l’application autonome (hors ligne).
 window.TRANSDOC_SUPABASE = { url: 'https://naobxnlcmeguqhfiiluz.supabase.co', key: 'sb_publishable_R85sIraKTm_CPBoONI7e3g_DMLl-Hk-' };
 </script>
 <style>
@@ -550,7 +552,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   function tousControles(){return Object.entries(S.ctrl).flatMap(([aid,d])=>(d?.liste||[]).map(c=>({...c,agentId:aid})))}
   function renderMesControles(){
     const l=(S.ctrl[S.me]?.liste||[]).slice(0,6);
-    $('#mesControles').innerHTML=l.length?l.map(c=>`<li><span>${plaqueHTML(c.plaque||'?',true)}<br><span class="note">${new Date(c.t).toLocaleString('fr-FR')} · ${c.source==='qr'?'QR':'saisie'}</span></span><span class="pill ${c.c==='introuvable'?'ko':c.c}">${c.c==='ok'?'Conforme':c.c==='warn'?'À renouveler':c.c==='ko'?'Non conforme':'Introuvable'}</span></li>`).join(''):'<li class="note">Aucun contrôle pour le moment.</li>';
+    $('#mesControles').innerHTML=l.length?l.map(c=>`<li><span>${plaqueHTML(c.plaque||'?',true)}<br><span class="note">${new Date(c.t).toLocaleString('fr-FR')} · ${c.source==='qr'?'QR':'saisie'}</span></span><span class="pill ${c.c==='introuvable'?'ko':c.c==='non_verifie'?'warn':c.c}">${c.c==='ok'?'Conforme':c.c==='warn'?'À renouveler':c.c==='non_verifie'?'Non vérifié':c.c==='ko'?'Non conforme':'Introuvable'}</span></li>`).join(''):'<li class="note">Aucun contrôle pour le moment.</li>';
   }
   function renderStats(){
     if($('#stats').hidden&&document.querySelector('[data-tab=stats]').hidden) return;
@@ -598,7 +600,8 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
     const CLE='transdoc.cleQR';
     const mess=e=>{const m=e?.message||String(e);
       if(e?.code==='23505'||/duplicate key|vehicles_pkey/.test(m)) return "Cette immatriculation est déjà inscrite au registre. Si le véhicule vous appartient, contactez la DGTT.";
-      if(/vehicles_plaque_check/.test(m)) return "Immatriculation invalide : 4 à 12 lettres et chiffres.";
+      if(/vehicles_plaque_check|vehicles_demo_prefixe/.test(m)) return "Immatriculation invalide : 4 à 12 lettres et chiffres.";
+      if(/row-level security.*"vehicles"/.test(m)) return "Ajoutez et confirmez votre e-mail (rubrique Mon accès) avant d’inscrire un véhicule.";
       if(/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Pas de connexion Internet. Réessayez dans un instant.";
       if(/Invalid login credentials/i.test(m)) return "E-mail ou mot de passe incorrect.";
       if(/Email not confirmed/i.test(m)) return "Confirmez d’abord votre e-mail avec le lien reçu.";
@@ -653,6 +656,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
           // Seules les dates modifiées redeviennent des déclarations : une pièce vérifiée inchangée le reste.
           for(const [d] of DOCS) if(ancien[d]!==f[d]) await q(sb.from('vehicle_documents').update({expire_le:f[d],statut:'declare'}).eq('plaque',editKey).eq('piece',d));
         }else{
+          if(compte?.anonyme){toast('Ajoutez et confirmez votre e-mail (rubrique Mon accès) avant d’inscrire un véhicule.');return}
           await q(sb.from('vehicles').insert({plaque:k,plaque_affichee:f.plaque,owner_id:S.me,...champs}));
           await q(sb.from('vehicle_documents').insert(DOCS.map(([d])=>({plaque:k,piece:d,expire_le:f[d],statut:'declare'}))));
         }
@@ -694,8 +698,9 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
       charger().catch(()=>{});
       if(!r.trouve){box.className='verdict ko';box.innerHTML=badge+`<strong>Véhicule introuvable</strong><p class="note" style="margin:6px 0 0">Aucun véhicule du registre national ne correspond à « ${esc(saisie)} ». Demandez les pièces physiques.</p>`;return}
       const lib={ok:'Valide',warn:'À renouveler',ko:'Expirée'};
-      box.className='verdict '+r.resultat;
-      box.innerHTML=badge+`${plaqueHTML(r.plaque)}<div class="big">${r.resultat==='ko'?'Non conforme':'Conforme'}</div>
+      const nv=r.resultat==='non_verifie';
+      box.className='verdict '+(nv?'warn':r.resultat);
+      box.innerHTML=badge+`${plaqueHTML(r.plaque)}<div class="big">${r.resultat==='ko'?'Non conforme':nv?'Pièces non vérifiées':'Conforme'}</div>${nv?'<p class="note" style="margin:4px 0 0">Dates déclarées par le propriétaire, pas encore vérifiées par la DGTT. Demandez les pièces physiques.</p>':''}
         <div class="note">${esc(r.marque)} ${esc(r.modele||'')} · ${esc(r.categorie)} · ${esc(r.titulaire)} · ${esc(r.province)}${source==='qr'?' · lu par QR':''}</div>
         <ul class="docs" style="padding:10px 0 0">${DOCS.map(([k,l])=>{const p=r.pieces[k];return p?`<li><span>${l}<br><span class="note">jusqu'au ${fmtDate(p.expire_le)} · ${p.statut==='verifie'?'✓ vérifiée':'déclarée par le propriétaire'}</span></span><span class="pill ${p.etat}">${lib[p.etat]}</span></li>`:`<li><span>${l}</span><span class="pill ko">Manquante</span></li>`}).join('')}</ul>
         ${r.toutes_verifiees?'':'<p class="note" style="margin:10px 0 0">⚠ Certaines pièces sont seulement déclarées par le propriétaire : demandez les justificatifs.</p>'}
