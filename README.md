@@ -2,6 +2,16 @@
 
 Registre national des documents de transport : chaque propriétaire inscrit ses véhicules et leurs pièces (assurance, visite technique, vignette) et présente un code QR signé lors d'un contrôle ; l'agent vérifie en quelques secondes, même sans réseau pour l'authenticité du QR.
 
+## Espaces après connexion
+
+| Rôle | Attribué par | Onglets |
+| --- | --- | --- |
+| Propriétaire | Inscription (e-mail confirmé) | Mes véhicules, Échéances, Mon compte |
+| Agent de contrôle | Un administrateur (onglet Agents) | Contrôle routier (QR ou plaque), Mon compte |
+| Administrateur (DGTT) | Un autre administrateur | Registre national (consultation, vérification des pièces), Tableau de bord, Journal des contrôles, Agents, Mon compte |
+
+Le rôle est lu sur le serveur : l'application n'affiche que l'espace correspondant, et les fonctions de la base refusent tout appel hors rôle (statistiques, registre et journal réservés à l'administration).
+
 ## Contenu du dépôt
 
 | Chemin | Rôle |

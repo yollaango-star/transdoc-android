@@ -84,7 +84,7 @@ test('pièces : le propriétaire déclare, seul le serveur ou l’administrateur
 
 test('contrôle : réservé aux agents, toujours journalisé, par plaque ou par code', async () => {
   await rejects(user(P1, `select public.controler('DEMOES9745B')`), /Réservé aux agents/);
-  await rejects(user(P1, `select * from public.stats_provinces()`), /Réservé aux agents/);
+  await rejects(user(P1, `select * from public.stats_provinces()`), /Réservé aux administrateurs/);
   await user(AD, `select public.admin_definir_role($1, 'agent')`, [AG]);
   const r = (await one(user(AG, `select public.controler('es-1234 a', 'saisie') r`))).r;
   assert.equal(r.trouve, true); assert.equal(r.resultat, 'ko'); // vignette expirée
@@ -102,15 +102,17 @@ test('contrôle : réservé aux agents, toujours journalisé, par plaque ou par 
 });
 
 test('tableau de bord : chiffres agrégés par province, filtres', async () => {
-  const rows = (await user(AG, 'select * from public.stats_provinces()')).rows;
+  await rejects(user(AG, 'select * from public.stats_provinces()'), /Réservé aux administrateurs/); // l'agent contrôle, l'administration consulte
+  const rows = (await user(AD, 'select * from public.stats_provinces()')).rows;
   assert.equal(rows.length, 9);
   assert.equal(rows.reduce((s, r) => s + r.total, 0), 165); // 164 démo + 1 réel
   assert.ok(rows.every(r => r.ok + r.warn + r.ko === r.total));
-  const reels = (await user(AG, 'select sum(total)::int n from public.stats_provinces(null, false)')).rows[0].n;
+  const reels = (await user(AD, 'select sum(total)::int n from public.stats_provinces(null, false)')).rows[0].n;
   assert.equal(reels, 1);
-  const taxis = (await user(AG, `select sum(total)::int n from public.stats_provinces('Taxi', true)`)).rows[0].n;
+  const taxis = (await user(AD, `select sum(total)::int n from public.stats_provinces('Taxi', true)`)).rows[0].n;
   assert.ok(taxis >= 1 && taxis < 165);
-  const s = (await one(user(AG, 'select public.stats_controles() s'))).s;
+  await rejects(user(AG, 'select public.stats_controles()'), /Réservé aux administrateurs/);
+  const s = (await one(user(AD, 'select public.stats_controles() s'))).s;
   assert.equal(s.total, 3); assert.equal(s.par_qr, 1); assert.equal(s.agents, 1);
 });
 
@@ -191,7 +193,7 @@ test('DEV-2 : des pièces seulement déclarées ne sont jamais « conformes »',
   // Une pièce expirée l'emporte sur l'absence de vérification
   await user(P1, `update public.vehicle_documents set expire_le = current_date - 1 where plaque = 'ES8080A' and piece = 'vignette'`);
   assert.equal((await one(user(AG, `select public.controler('ES8080A') r`))).r.resultat, 'ko');
-  assert.equal((await one(user(AG, 'select public.stats_controles() s'))).s.non_verifies, 1);
+  assert.equal((await one(user(AD, 'select public.stats_controles() s'))).s.non_verifies, 1);
 });
 
 test('OPS-2 : la démonstration ne peut pas occuper une vraie plaque', async () => {
@@ -219,4 +221,44 @@ test('DEV-5 : échéances à la date de Libreville, recherche sans jokers', asyn
   assert.equal((await user(AD, `select * from public.admin_rechercher('%%')`)).rows.length, 0);
   assert.equal((await user(AD, `select * from public.admin_rechercher('__')`)).rows.length, 0);
   assert.deepEqual((await user(AD, `select email from public.admin_rechercher('dgtt')`)).rows.map(x => x.email), ['admin@dgtt.ga']);
+});
+
+test('administration : consultation de tout le registre, recherche et filtres', async () => {
+  await rejects(user(P1, `select public.admin_vehicules()`), /Réservé aux administrateurs/);
+  const tout = (await one(user(AD, `select public.admin_vehicules(null, null, false, true, 500) r`))).r;
+  assert.equal(tout.total, await n(db.query('select count(*)::int n from public.vehicles')));
+  assert.equal(tout.vehicules.length, Math.min(tout.total, 200)); // page plafonnée à 200
+  assert.equal((await one(user(AD, `select public.admin_vehicules(null, null, false, true, 5) r`))).r.vehicules.length, 5);
+  const reels = (await one(user(AD, `select public.admin_vehicules() r`))).r;
+  assert.ok(reels.vehicules.every(v => !v.demo));
+  const p = (await one(user(AD, `select public.admin_vehicules('es-8080 a') r`))).r;
+  assert.deepEqual(p.vehicules.map(v => v.plaque), ['ES-8080-A']);
+  assert.deepEqual(Object.keys(p.vehicules[0].pieces).sort(), ['assurance', 'vignette', 'visite']);
+  const code = (await one(db.query(`select code from public.vehicles where plaque = 'DEMOES9745B'`))).code;
+  assert.equal((await one(user(AD, `select public.admin_vehicules($1, null, false, true) r`, [code]))).r.total, 1);
+  assert.equal((await one(user(AD, `select public.admin_vehicules('%', null, false, true) r`))).r.total, 0);
+  const ho = (await one(user(AD, `select public.admin_vehicules(null, 'Haut-Ogooué', false, true, 500) r`))).r;
+  assert.ok(ho.total > 0 && ho.vehicules.every(v => v.province === 'Haut-Ogooué'));
+  const av = (await one(user(AD, `select public.admin_vehicules(null, null, true, true, 500) r`))).r;
+  assert.ok(av.vehicules.every(v => Object.values(v.pieces).some(x => x.statut !== 'verifie')));
+  // Vérification d'une pièce par l'administration, puis disparition du filtre « à vérifier »
+  await user(AD, `update public.vehicle_documents set statut = 'verifie', source = 'admin' where plaque = 'ES8080A'`);
+  assert.equal((await one(user(AD, `select public.admin_vehicules('ES8080A', null, true) r`))).r.total, 0);
+});
+
+test('administration : journal de tous les contrôles, agent conservé ou « Compte supprimé »', async () => {
+  const P3 = '66666666-6666-4666-8666-666666666666';
+  await db.exec(`insert into auth.users (id, email) values ('${P3}', 'agent2@police.ga'); update public.profiles set nom = 'Agent Nze' where id = '${P3}';`);
+  await user(AD, `select public.admin_definir_role($1, 'agent')`, [P3]);
+  await user(P3, `select public.controler('ES8080A', 'qr')`);
+  await rejects(user(P3, `select * from public.admin_controles()`), /Réservé aux administrateurs/);
+  await rejects(user(P3, `select public.admin_vehicules()`), /Réservé aux administrateurs/);
+  await rejects(user(P3, 'select * from public.stats_provinces()'), /Réservé aux administrateurs/);
+  assert.equal(await n(user(P3, 'select count(*)::int n from public.controles')), 1); // l'agent ne voit que les siens
+  const j = (await user(AD, `select * from public.admin_controles()`)).rows;
+  assert.equal(j.length, await n(db.query('select count(*)::int n from public.controles')));
+  assert.equal(j[0].agent, 'Agent Nze'); assert.equal(j[0].source, 'qr');
+  assert.ok(j.some(x => x.agent === 'Compte supprimé')); // contrôles de l'agent supprimé (DEV-3)
+  assert.ok((await user(AD, `select * from public.admin_controles('ko')`)).rows.every(x => x.resultat === 'ko'));
+  assert.equal((await user(AD, `select * from public.admin_controles(null, null, 1)`)).rows.length, 1);
 });
