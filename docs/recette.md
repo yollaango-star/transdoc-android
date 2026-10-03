@@ -43,6 +43,9 @@ Une ligne en échec avec la gravité « Bloquante » interdit la mise en product
 | R24 | Retour Android | Ouvrir une fenêtre, appui sur Retour | La fenêtre se ferme, l'app reste ouverte | Mineure | | |
 | R25 | Rotation, mode sombre | Pivoter l'écran ; activer le thème sombre | Pas de perte de saisie, contrastes lisibles | Mineure | | |
 | R26 | Mise à jour | Installer la nouvelle version par-dessus la précédente | Mise à jour acceptée (même clé de signature), session conservée | Bloquante | | |
+| R27 | QR non signé | Scanner un ancien QR sans signature (format v1) | « Code QR refusé », invitation à saisir la plaque | Bloquante | | |
+| R28 | Rotation de clé | En recette : rotation selon `docs/exploitation.md` §5, puis scanner un QR signé avec l'ancienne clé et un QR re-signé | Les deux « authentiques » ; après retrait de l'ancienne clé, l'ancien QR est « Signature non vérifiable » | Majeure | | |
+| R29 | Journal conservé | Supprimer le compte d'un agent ayant fait des contrôles | Tableau de bord : nombre total de contrôles inchangé | Majeure | | |
 
 ## Procès-verbal
 
