@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/
 import { assert, assertEquals } from 'jsr:@std/assert@1.0.19';
-import { ALGO, depuisBase64url, message, partiePublique, signer, verifier, versBase64url } from './qr.ts';
+import { ALGO, cleDuKid, depuisBase64url, lireRetirees, message, partiePublique, perime, signer, verifier, versBase64url, VALIDITE_SECONDES } from './qr.ts';
 
 const paire = async () => await crypto.subtle.generateKey(ALGO, true, ['sign', 'verify']) as CryptoKeyPair;
 
@@ -32,4 +32,27 @@ Deno.test('encodage base64url et message', () => {
   assertEquals(depuisBase64url(versBase64url(o)), o);
   assert(!/[+/=]/.test(versBase64url(o)));
   assertEquals(message('TDX', 'ES-1-A', 5), 'TD2|TDX|ES-1-A|5');
+});
+
+Deno.test('rotation : la clé est choisie par son kid, les clés retirées restent valables', async () => {
+  const ancienne = await paire(), nouvelle = await paire();
+  const pub = async (k: CryptoKeyPair) => partiePublique(await crypto.subtle.exportKey('jwk', k.privateKey));
+  const active = { kid: 'k2', cle: await pub(nouvelle) };
+  const retirees = lireRetirees(JSON.stringify([{ kid: 'k1', cle: await pub(ancienne) }, { kid: 'casse' }]));
+  assertEquals(retirees.map((c) => c.kid), ['k1']);
+  const sig = await signer(ancienne.privateKey, 'TDX', 'ES-1-A', 5);
+  const cle = cleDuKid(active, retirees, 'k1');
+  assert(cle);
+  const k = await crypto.subtle.importKey('jwk', cle.cle, ALGO, false, ['verify']);
+  assert(await verifier(k, { code: 'TDX', plaque: 'ES-1-A', t: 5, sig }));
+  assertEquals(cleDuKid(active, retirees, 'inconnu'), null);
+  assertEquals(lireRetirees('pas du json'), []);
+  assertEquals(lireRetirees(undefined), []);
+});
+
+Deno.test('un QR de plus d’un an est périmé', () => {
+  const maintenant = 1_800_000_000;
+  assert(!perime(maintenant - 10, maintenant));
+  assert(!perime(maintenant - VALIDITE_SECONDES, maintenant));
+  assert(perime(maintenant - VALIDITE_SECONDES - 1, maintenant));
 });
