@@ -503,6 +503,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   const DOCS=[['assurance','Assurance',35000],['visite','Visite technique',25000],['vignette','Vignette',50000]];
   const PROVINCES=['Estuaire','Haut-Ogooué','Moyen-Ogooué','Ngounié','Nyanga','Ogooué-Ivindo','Ogooué-Lolo','Ogooué-Maritime','Woleu-Ntem'];
   const ROLES={admin:'Administrateur',agent:'Agent de contrôle',proprietaire:'Propriétaire'};
+const DANS_APK=location.hostname==='appassets.androidplatform.net';
 const ESPACES={admin:'Espace administration',agent:'Espace contrôle',proprietaire:'Propriétaire'};
 const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:['warn','Non vérifié'],ko:['ko','Non conforme'],introuvable:['ko','Introuvable']};
   const $=s=>document.querySelector(s);
@@ -680,7 +681,9 @@ const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:
       // La session gardée sur le téléphone peut dater d'avant une confirmation d'e-mail faite dans le navigateur :
       // on relit le compte auprès du serveur au démarrage, au retour dans l'application et à chaque renouvellement de jeton.
       sb.auth.onAuthStateChange((ev,s)=>{if(s&&['USER_UPDATED','TOKEN_REFRESHED','SIGNED_IN'].includes(ev)){compte=infos(s.user);setTimeout(renderCompte,0)}});
-      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&compte&&(compte.anonyme||compte.enAttente)) actualiserCompte()});
+      const auRetour=()=>{if(compte&&(compte.anonyme||compte.enAttente)) actualiserCompte()};
+      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible') auRetour()});
+      ['transdoc:retour','focus','pageshow'].forEach(ev=>window.addEventListener(ev,auRetour));
       try{
         let {data:{session}}=await sb.auth.getSession();
         if(!session){const r=await sb.auth.signInAnonymously(); if(r.error) throw r.error; session=r.data.session}
@@ -705,7 +708,8 @@ const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:
           // Seules les dates modifiées redeviennent des déclarations : une pièce vérifiée inchangée le reste.
           for(const [d] of DOCS) if(ancien[d]!==f[d]) await q(sb.from('vehicle_documents').update({expire_le:f[d],statut:'declare'}).eq('plaque',editKey).eq('piece',d));
         }else{
-          if(compte?.anonyme){toast('Ajoutez et confirmez votre e-mail (rubrique Mon accès) avant d’inscrire un véhicule.');return}
+          if(compte?.anonyme) await actualiserCompte(true);
+          if(compte?.anonyme){toast(compte.enAttente?'Confirmez d’abord votre e-mail avec le lien reçu, puis réessayez.':'Ajoutez et confirmez votre e-mail (rubrique Mon accès) avant d’inscrire un véhicule.');return}
           await q(sb.from('vehicles').insert({plaque:k,plaque_affichee:f.plaque,owner_id:S.me,...champs}));
           await q(sb.from('vehicle_documents').insert(DOCS.map(([d])=>({plaque:k,piece:d,expire_le:f[d],statut:'declare'}))));
         }
@@ -798,13 +802,13 @@ const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:
       const mdp=(()=>{try{return !!localStorage.getItem('transdoc.mdp.'+compte.id)}catch(e){return false}})();
       let h=`<h3 style="font-size:1.1rem;margin-bottom:6px">Mon accès</h3><p class="note" style="margin-top:0">${compte.anonyme?'Profil anonyme, enregistré sur ce téléphone.':'Connecté avec <strong>'+esc(compte.email)+'</strong>.'} Rôle : <strong>${ROLES[role()]}</strong>.</p>`;
       if(compte.anonyme&&!compte.enAttente) h+=`<form id="fSecuriser" class="form" style="margin-top:10px"><label class="full">Ajouter un e-mail pour retrouver mes véhicules sur un autre téléphone<input name="email" type="email" required autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="vous@exemple.ga"></label><div class="full"><button class="btn" type="submit">Recevoir le lien de confirmation</button></div></form>`;
-      if(compte.enAttente) h+=`<p class="note">Lien envoyé à <strong>${esc(compte.enAttente)}</strong> : ouvrez-le pour confirmer (la page qui s'ouvre ensuite peut afficher une erreur, ce n'est pas grave), puis revenez ici.</p><button class="btn ghost" id="bConfirme" type="button">J’ai confirmé mon e-mail</button>`;
+      if(compte.enAttente) h+=`<p class="note">Lien envoyé à <strong>${esc(compte.enAttente)}</strong> : ouvrez-le pour confirmer, ${DANS_APK?'TransDoc se rouvre ensuite. S’il ne se rouvre pas, revenez ici':'puis revenez ici (la page qui s’ouvre peut afficher une erreur, ce n’est pas grave)'}.</p><button class="btn ghost" id="bConfirme" type="button">J’ai confirmé mon e-mail</button>`;
       if(!compte.anonyme&&!mdp) h+=`<form id="fMdp" class="form" style="margin-top:10px"><label class="full">Choisir un mot de passe pour vous reconnecter<input name="mdp" type="password" required minlength="8" autocomplete="new-password"></label><div class="full"><button class="btn" type="submit">Enregistrer le mot de passe</button></div></form>`;
       h+=`<details style="margin-top:14px"${oubli?' open':''}><summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">Agent ou administrateur : se connecter</summary><form id="fConnexion" class="form" style="margin-top:10px"><label class="full">E-mail<input name="email" type="email" required autocomplete="username" autocapitalize="none" spellcheck="false"></label><label class="full">Mot de passe<input name="mdp" type="password" required autocomplete="current-password"></label><div class="full" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="btn" type="submit">Se connecter</button><button class="btn ghost" type="button" id="bOubli">Mot de passe oublié ?</button></div>${compte.anonyme?'<p class="note full" style="margin:0">Les véhicules de ce profil anonyme ne seront plus accessibles après connexion à un autre compte : ajoutez d’abord un e-mail.</p>':''}</form>${oubli?formOubli():''}</details>`;
       h+=`<div class="v-actions" style="padding:14px 0 0">${compte.anonyme?'':'<button class="btn ghost" id="bDeconnexion">Se déconnecter</button>'}<button class="btn danger" id="bSupprimer">Supprimer mon compte</button></div>`;
       p.innerHTML=h;
       $('#bConfirme')?.addEventListener('click',async()=>{await actualiserCompte(); if(compte.enAttente&&compte.anonyme) toast('Pas encore confirmé : ouvrez le lien reçu par e-mail, puis réessayez.')});
-      $('#fSecuriser')?.addEventListener('submit',async e=>{e.preventDefault();const m=e.target.email.value.trim().toLowerCase();try{const r=await sb.auth.updateUser({email:m});if(r.error) throw r.error;compte.enAttente=m;toast('Lien de confirmation envoyé.');renderCompte()}catch(x){echec(x)}});
+      $('#fSecuriser')?.addEventListener('submit',async e=>{e.preventDefault();const m=e.target.email.value.trim().toLowerCase();try{const r=await sb.auth.updateUser({email:m},DANS_APK?{emailRedirectTo:'transdoc://confirmation'}:undefined);if(r.error) throw r.error;compte.enAttente=m;toast('Lien de confirmation envoyé.');renderCompte()}catch(x){echec(x)}});
       $('#fMdp')?.addEventListener('submit',async e=>{e.preventDefault();try{const r=await sb.auth.updateUser({password:e.target.mdp.value});if(r.error) throw r.error;localStorage.setItem('transdoc.mdp.'+compte.id,'1');toast('Mot de passe enregistré.');renderCompte()}catch(x){echec(x)}});
       $('#fConnexion')?.addEventListener('submit',async e=>{e.preventDefault();try{const r=await sb.auth.signInWithPassword({email:e.target.email.value.trim().toLowerCase(),password:e.target.mdp.value});if(r.error) throw r.error;try{localStorage.setItem('transdoc.mdp.'+r.data.user.id,'1')}catch(x){}compte=infos(r.data.user);S.me=r.data.user.id;toast('Connecté.');await charger()}catch(x){echec(x)}});
       $('#bOubli')?.addEventListener('click',()=>{oubli={email:p.querySelector('#fConnexion [name=email]').value.trim().toLowerCase(),envoye:false};renderCompte();$('#fOubliEmail [name=email]')?.focus()});

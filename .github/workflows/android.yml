@@ -149,8 +149,10 @@ jobs:
           }
 
           // Signature : si les variables TRANSDOC_KEYSTORE* sont fournies (secrets GitHub), l'APK est signé
-          // avec la clé officielle TransDoc ; sinon avec une clé de test (installable, mais sans mise à jour possible).
+          // avec la clé officielle TransDoc ; sinon avec la clé de RECETTE du dépôt (signature/transdoc-recette.p12),
+          // toujours la même : chaque APK de recette s'installe par-dessus le précédent.
           def keystore = System.getenv('TRANSDOC_KEYSTORE')
+          def cleRecette = file("${rootDir}/../signature/transdoc-recette.p12")
 
           android {
               namespace 'ga.transdoc.app'
@@ -174,13 +176,20 @@ jobs:
                           keyPassword System.getenv('TRANSDOC_KEY_PASSWORD')
                       }
                   }
+                  recette {
+                      storeFile cleRecette
+                      storeType 'pkcs12'
+                      storePassword 'transdoc-recette'
+                      keyAlias 'transdoc-recette'
+                      keyPassword 'transdoc-recette'
+                  }
               }
 
               buildTypes {
                   release {
                       minifyEnabled true
                       proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
-                      signingConfig keystore ? signingConfigs.officielle : signingConfigs.debug
+                      signingConfig keystore ? signingConfigs.officielle : signingConfigs.recette
                   }
               }
 
@@ -215,11 +224,19 @@ jobs:
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
+                      android:launchMode="singleTask"
                       android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
                       android:windowSoftInputMode="adjustResize">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                      <!-- Retour après le lien de confirmation de l'e-mail (redirection Supabase vers transdoc://confirmation) -->
+                      <intent-filter>
+                          <action android:name="android.intent.action.VIEW" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                          <category android:name="android.intent.category.BROWSABLE" />
+                          <data android:scheme="transdoc" android:host="confirmation" />
                       </intent-filter>
                   </activity>
               </application>
@@ -367,6 +384,29 @@ jobs:
                   web.evaluateJavascript(
                           "(function(){var d=document.querySelector('dialog[open]');if(d){d.close();return true}return false})()",
                           valeur -> { if (!"true".equals(valeur)) MainActivity.super.onBackPressed(); });
+              }
+
+              /** Retour dans l'application (depuis la messagerie, le navigateur…) : la page relit l'état du compte. */
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  if (web != null) {
+                      web.onResume();
+                      web.evaluateJavascript("window.dispatchEvent(new Event('transdoc:retour'))", null);
+                  }
+              }
+
+              @Override
+              protected void onPause() {
+                  if (web != null) web.onPause();
+                  super.onPause();
+              }
+
+              /** Lien transdoc://confirmation : l'application déjà ouverte revient au premier plan (onResume suit). */
+              @Override
+              protected void onNewIntent(Intent intent) {
+                  super.onNewIntent(intent);
+                  setIntent(intent);
               }
 
               @Override
