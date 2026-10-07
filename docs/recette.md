@@ -10,6 +10,7 @@ Une ligne en échec avec la gravité « Bloquante » interdit la mise en product
 | APK | Artifact `TransDoc-apk` de la dernière exécution verte de la CI (jobs `tests` et `apk`) |
 | Appareils | 3 au minimum : Android 8 (API 26), Android 11 (API 30), Android 14 (API 34) |
 | Comptes | 1 propriétaire A, 1 propriétaire B, 1 agent, 1 administrateur DGTT (rôles attribués par l'administrateur) |
+| Installation | Désinstaller une fois toute version de TransDoc compilée avant le 7 octobre 2026 (signée avec une clé aléatoire) ; les APK suivants, signés avec la clé de recette, s'installent par-dessus |
 | Réseau | Chaque parcours marqué « hors ligne » est rejoué en mode avion |
 | Registre | Migrations à jour, `seed.sql` appliqué (plaques `DEMO-…`) |
 
@@ -19,7 +20,7 @@ Une ligne en échec avec la gravité « Bloquante » interdit la mise en product
 | --- | --- | --- | --- | --- | --- | --- |
 | R01 | Premier lancement | Installer l'APK, ouvrir | Accueil affiché, bandeau « Connexion au registre national… » puis disparu, profil anonyme créé | Bloquante | | |
 | R02 | Inscription refusée sans compte | Profil anonyme : inscrire un véhicule | Refus avec le message « Ajoutez et confirmez votre e-mail… » ; aucun véhicule créé | Bloquante | | |
-| R03 | Sécuriser le compte | Mon accès → ajouter un e-mail → ouvrir le lien reçu → revenir dans l'app | Toast « E-mail confirmé », formulaire mot de passe proposé | Bloquante | | |
+| R03 | Sécuriser le compte | Mon accès → ajouter un e-mail → ouvrir le lien reçu | TransDoc se rouvre seul (sinon, y revenir) ; toast « E-mail confirmé », formulaire mot de passe proposé ; l'inscription d'un véhicule est alors acceptée | Bloquante | | |
 | R04 | Choisir un mot de passe | Saisir 8 caractères ou plus | Mot de passe enregistré ; 7 caractères refusés | Majeure | | |
 | R05 | Inscrire un véhicule | Compte confirmé : plaque, catégorie, pièces avec dates | Véhicule visible, pièces « déclarées » | Bloquante | | |
 | R06 | Plaque déjà inscrite | Propriétaire B : inscrire la plaque de A | Message « déjà inscrite… contactez la DGTT » | Bloquante | | |
