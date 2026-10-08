@@ -504,6 +504,7 @@ footer{border-top:1px solid var(--trait);padding:20px 0 30px;color:var(--doux);f
   const PROVINCES=['Estuaire','Haut-Ogooué','Moyen-Ogooué','Ngounié','Nyanga','Ogooué-Ivindo','Ogooué-Lolo','Ogooué-Maritime','Woleu-Ntem'];
   const ROLES={admin:'Administrateur',agent:'Agent de contrôle',proprietaire:'Propriétaire'};
 const DANS_APK=location.hostname==='appassets.androidplatform.net';
+const RETOUR_LIEN=DANS_APK?'transdoc://confirmation':location.origin+location.pathname;
 const ESPACES={admin:'Espace administration',agent:'Espace contrôle',proprietaire:'Propriétaire'};
 const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:['warn','Non vérifié'],ko:['ko','Non conforme'],introuvable:['ko','Introuvable']};
   const $=s=>document.querySelector(s);
@@ -684,11 +685,26 @@ const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:
       const auRetour=()=>{if(compte&&(compte.anonyme||compte.enAttente)) actualiserCompte()};
       document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible') auRetour()});
       ['transdoc:retour','focus','pageshow'].forEach(ev=>window.addEventListener(ev,auRetour));
+      window.addEventListener('transdoc:lien',async e=>{const u=String(e.detail||''),i=u.indexOf('#'); if(i<0) return;
+        try{if(await traiterLien(u.slice(i))){await charger();renderCompte()}}catch(x){echec(x)}});
       try{
+        if(/access_token=|error=/.test(location.hash)){const h=location.hash; history.replaceState(null,'',location.pathname+location.search); try{await traiterLien(h)}catch(x){echec(x)}}
         let {data:{session}}=await sb.auth.getSession();
         if(!session){const r=await sb.auth.signInAnonymously(); if(r.error) throw r.error; session=r.data.session}
         compte=infos(session.user); S.me=session.user.id; bandeau(''); await actualiserCompte(true); await charger();
       }catch(e){console.error(e);bandeau(mess(e)+' Le registre sera accessible au retour de la connexion.',true)}
+    }
+    // Lien reçu par e-mail (récupération de mot de passe, confirmation d'adresse) : Supabase renvoie la session dans le fragment.
+    async function traiterLien(h){
+      const p=new URLSearchParams(String(h||'').replace(/^#/,''));
+      if(p.get('error')||p.get('error_code')){const d=(p.get('error_code')||'')+' '+(p.get('error_description')||'');
+        toast(/expired|invalid|not.?found/i.test(d)?'Lien expiré ou déjà utilisé. Demandez-en un nouveau.':'Lien refusé : '+(p.get('error_description')||p.get('error')));return false}
+      const at=p.get('access_token'),rt=p.get('refresh_token'); if(!at||!rt) return false;
+      const {data,error}=await sb.auth.setSession({access_token:at,refresh_token:rt}); if(error) throw error;
+      compte=infos(data.user); S.me=data.user.id;
+      if(p.get('type')==='recovery'){oubli={recup:true,email:data.user.email};toast('Choisissez votre nouveau mot de passe.');document.querySelector('[data-tab="profil"]')?.click()}
+      else toast('E-mail confirmé.');
+      return true;
     }
     // Relit le compte sur le serveur ; si l'e-mail vient d'être confirmé, renouvelle la session (le jeton en cache dit encore « anonyme »).
     async function actualiserCompte(silencieux){
@@ -790,12 +806,14 @@ const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:
     // Mot de passe oublié : un code reçu par e-mail (et non un lien, qui s'ouvrirait hors de l'application)
     // ouvre une session de récupération, puis le nouveau mot de passe est enregistré. oubli = { email, envoye }.
     let oubli=null;
-    const formOubli=()=>`<div class="panel" style="margin-top:14px;padding:16px" id="pOubli"><h4 style="margin:0 0 6px;font-size:1rem">Mot de passe oublié</h4>${!oubli.envoye
+    const formOubli=()=>`<div class="panel" style="margin-top:14px;padding:16px" id="pOubli"><h4 style="margin:0 0 6px;font-size:1rem">Mot de passe oublié</h4>${oubli.recup
+      ?`<p class="note" style="margin-top:0">Lien vérifié pour <strong>${esc(oubli.email||'')}</strong>. Choisissez votre nouveau mot de passe.</p><form id="fOubliNouveau" class="form"><label class="full">Nouveau mot de passe<input name="mdp" type="password" required minlength="8" autocomplete="new-password"></label><div class="full"><button class="btn" type="submit">Enregistrer le mot de passe</button></div></form>`
+      :!oubli.envoye
       ?`<form id="fOubliEmail" class="form"><label class="full">E-mail du compte<input name="email" type="email" required autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(oubli.email||'')}"></label><div class="full" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Recevoir un code</button><button class="btn ghost" type="button" data-oubli-annuler>Annuler</button></div></form>`
-      :`<p class="note" style="margin-top:0">Si un compte existe pour <strong>${esc(oubli.email)}</strong>, un code vient de lui être envoyé par e-mail. Il est valable une heure.</p><form id="fOubliCode" class="form"><label>Code reçu<input name="code" inputmode="numeric" autocomplete="one-time-code" required pattern="[0-9]{6,10}" maxlength="10" placeholder="123456"></label><label>Nouveau mot de passe<input name="mdp" type="password" required minlength="8" autocomplete="new-password"></label><div class="full" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Changer le mot de passe</button><button class="btn ghost" type="button" id="bOubliRenvoi">Renvoyer un code</button><button class="btn ghost" type="button" data-oubli-annuler>Annuler</button></div></form>`}</div>`;
+      :`<p class="note" style="margin-top:0">Si un compte existe pour <strong>${esc(oubli.email)}</strong>, un e-mail vient de lui être envoyé (valable une heure). Ouvrez le lien qu'il contient : TransDoc vous proposera un nouveau mot de passe. S'il contient un code, saisissez-le ici.</p><form id="fOubliCode" class="form"><label>Code reçu<input name="code" inputmode="numeric" autocomplete="one-time-code" required pattern="[0-9]{6,10}" maxlength="10" placeholder="123456"></label><label>Nouveau mot de passe<input name="mdp" type="password" required minlength="8" autocomplete="new-password"></label><div class="full" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Changer le mot de passe</button><button class="btn ghost" type="button" id="bOubliRenvoi">Renvoyer un code</button><button class="btn ghost" type="button" data-oubli-annuler>Annuler</button></div></form>`}</div>`;
     async function envoyerCodeOubli(email){
-      const r=await sb.auth.resetPasswordForEmail(email); if(r.error) throw r.error;
-      oubli={email,envoye:true}; toast('Code envoyé si le compte existe.'); renderCompte();
+      const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:RETOUR_LIEN}); if(r.error) throw r.error;
+      oubli={email,envoye:true}; toast('E-mail envoyé si le compte existe.'); renderCompte();
     }
     function renderCompte(){
       const p=$('#comptePanel'); if(!p||!compte) return; p.hidden=false;
@@ -808,13 +826,18 @@ const RESULTATS={ok:['ok','Conforme'],warn:['warn','À renouveler'],non_verifie:
       h+=`<div class="v-actions" style="padding:14px 0 0">${compte.anonyme?'':'<button class="btn ghost" id="bDeconnexion">Se déconnecter</button>'}<button class="btn danger" id="bSupprimer">Supprimer mon compte</button></div>`;
       p.innerHTML=h;
       $('#bConfirme')?.addEventListener('click',async()=>{await actualiserCompte(); if(compte.enAttente&&compte.anonyme) toast('Pas encore confirmé : ouvrez le lien reçu par e-mail, puis réessayez.')});
-      $('#fSecuriser')?.addEventListener('submit',async e=>{e.preventDefault();const m=e.target.email.value.trim().toLowerCase();try{const r=await sb.auth.updateUser({email:m},DANS_APK?{emailRedirectTo:'transdoc://confirmation'}:undefined);if(r.error) throw r.error;compte.enAttente=m;toast('Lien de confirmation envoyé.');renderCompte()}catch(x){echec(x)}});
+      $('#fSecuriser')?.addEventListener('submit',async e=>{e.preventDefault();const m=e.target.email.value.trim().toLowerCase();try{const r=await sb.auth.updateUser({email:m},{emailRedirectTo:RETOUR_LIEN});if(r.error) throw r.error;compte.enAttente=m;toast('Lien de confirmation envoyé.');renderCompte()}catch(x){echec(x)}});
       $('#fMdp')?.addEventListener('submit',async e=>{e.preventDefault();try{const r=await sb.auth.updateUser({password:e.target.mdp.value});if(r.error) throw r.error;localStorage.setItem('transdoc.mdp.'+compte.id,'1');toast('Mot de passe enregistré.');renderCompte()}catch(x){echec(x)}});
       $('#fConnexion')?.addEventListener('submit',async e=>{e.preventDefault();try{const r=await sb.auth.signInWithPassword({email:e.target.email.value.trim().toLowerCase(),password:e.target.mdp.value});if(r.error) throw r.error;try{localStorage.setItem('transdoc.mdp.'+r.data.user.id,'1')}catch(x){}compte=infos(r.data.user);S.me=r.data.user.id;toast('Connecté.');await charger()}catch(x){echec(x)}});
       $('#bOubli')?.addEventListener('click',()=>{oubli={email:p.querySelector('#fConnexion [name=email]').value.trim().toLowerCase(),envoye:false};renderCompte();$('#fOubliEmail [name=email]')?.focus()});
       p.querySelectorAll('[data-oubli-annuler]').forEach(b=>b.addEventListener('click',()=>{oubli=null;renderCompte()}));
       $('#fOubliEmail')?.addEventListener('submit',async e=>{e.preventDefault();const b=e.target.querySelector('button[type=submit]');b.disabled=true;
         try{await envoyerCodeOubli(e.target.email.value.trim().toLowerCase())}catch(x){b.disabled=false;echec(x)}});
+      $('#fOubliNouveau')?.addEventListener('submit',async e=>{e.preventDefault();const b=e.target.querySelector('button[type=submit]');b.disabled=true;
+        try{const u=await sb.auth.updateUser({password:e.target.mdp.value}); if(u.error) throw u.error; oubli=null;
+          try{localStorage.setItem('transdoc.mdp.'+u.data.user.id,'1')}catch(x){}
+          compte=infos(u.data.user); S.me=u.data.user.id; toast('Mot de passe changé. Vous êtes connecté.'); await charger();
+        }catch(x){b.disabled=false;echec(x)}});
       $('#bOubliRenvoi')?.addEventListener('click',async e=>{e.target.disabled=true;try{await envoyerCodeOubli(oubli.email)}catch(x){e.target.disabled=false;echec(x)}});
       $('#fOubliCode')?.addEventListener('submit',async e=>{e.preventDefault();const b=e.target.querySelector('button[type=submit]');b.disabled=true;
         const email=oubli.email, code=e.target.code.value.trim(), mdpNouveau=e.target.mdp.value;

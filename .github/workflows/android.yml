@@ -264,6 +264,8 @@ jobs:
 
           import androidx.webkit.WebViewAssetLoader;
 
+          import org.json.JSONObject;
+
           /**
            * TransDoc Android : affiche l'application web embarquée (assets/index.html).
            * L'application est servie depuis https://appassets.androidplatform.net pour être un
@@ -348,8 +350,10 @@ jobs:
                       }
                   });
 
-                  if (etat != null) web.restoreState(etat);
-                  else web.loadUrl(ACCUEIL);
+                  Uri lien = getIntent().getData();
+                  String fragment = lien != null ? lien.getEncodedFragment() : null;
+                  if (etat != null && fragment == null) web.restoreState(etat);
+                  else web.loadUrl(fragment != null ? ACCUEIL + "#" + fragment : ACCUEIL);
               }
 
               @Override
@@ -407,6 +411,12 @@ jobs:
               protected void onNewIntent(Intent intent) {
                   super.onNewIntent(intent);
                   setIntent(intent);
+                  // Application déjà ouverte : le lien est transmis à la page (événement « transdoc:lien »)
+                  Uri lien = intent.getData();
+                  if (lien != null && web != null) {
+                      web.evaluateJavascript("window.dispatchEvent(new CustomEvent('transdoc:lien',{detail:"
+                              + JSONObject.quote(lien.toString()) + "}))", null);
+                  }
               }
 
               @Override
