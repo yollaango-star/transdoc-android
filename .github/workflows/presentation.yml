@@ -1,0 +1,46 @@
+# TransDoc — application de PRÉSENTATION pour Windows : un seul fichier TransDoc-presentation.exe (portable, sans installation),
+# qui fonctionne sans réseau, sans compte et sans e-mail (registre simulé : presentation/registre-local.js).
+# Résultat : onglet Actions → « Construire la présentation » → Artifacts → TransDoc-presentation.
+name: Construire la présentation
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'transdoc.html', 'demo-*.json', 'presentation/**', 'scripts/construire-presentation.js', '.github/workflows/presentation.yml' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'transdoc.html', 'demo-*.json', 'presentation/**', 'scripts/construire-presentation.js', '.github/workflows/presentation.yml' ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v5
+
+      - name: Installer Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Construire l'application (registre local, bibliothèques vérifiées)
+        run: node scripts/construire-presentation.js
+
+      - name: Installer Electron
+        working-directory: presentation
+        run: npm ci --no-audit --no-fund
+
+      - name: Créer TransDoc-presentation.exe
+        working-directory: presentation
+        run: npx electron-builder --win portable --publish never
+
+      - name: Mettre l'exécutable à disposition
+        uses: actions/upload-artifact@v5
+        with:
+          name: TransDoc-presentation
+          path: presentation/dist/TransDoc-presentation.exe
+          if-no-files-found: error

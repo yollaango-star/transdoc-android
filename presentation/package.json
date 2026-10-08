@@ -1,0 +1,35 @@
+{
+  "name": "transdoc-presentation",
+  "version": "1.0.0",
+  "description": "TransDoc Gabon — application de présentation pour ordinateur (sans réseau, sans compte)",
+  "private": true,
+  "main": "main.js",
+  "author": "YOLLA ANGO Fred Darrel",
+  "scripts": {
+    "construire": "node ../scripts/construire-presentation.js",
+    "demarrer": "npm run construire && electron .",
+    "exe": "npm run construire && electron-builder --win portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "ga.transdoc.presentation",
+    "productName": "TransDoc Présentation",
+    "files": [
+      "main.js",
+      "app/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "TransDoc-presentation.exe"
+    },
+    "copyright": "© 2026 YOLLA ANGO Fred Darrel"
+  }
+}

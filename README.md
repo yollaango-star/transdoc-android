@@ -1,5 +1,7 @@
 # TransDoc Gabon
 
+Développé par **YOLLA ANGO Fred Darrel**.
+
 Registre national des documents de transport : chaque propriétaire inscrit ses véhicules et leurs pièces (assurance, visite technique, vignette) et présente un code QR signé lors d'un contrôle ; l'agent vérifie en quelques secondes, même sans réseau pour l'authenticité du QR.
 
 ## Espaces après connexion
@@ -26,6 +28,19 @@ Le rôle est lu sur le serveur : l'application n'affiche que l'espace correspond
 | `demo-*.json` | Données de démonstration par province (source de `seed.sql` et du mode hors ligne) |
 | `docs/recette.md` | Cahier de recette et procès-verbal |
 | `docs/exploitation.md` | Mise en production, sauvegardes, restauration, rotation de la clé QR, retour arrière |
+
+## Présentation sur ordinateur (sans compte ni réseau)
+
+`TransDoc-presentation.exe` (Windows, portable, sans installation) montre l'application avec des données fictives :
+un bandeau en haut de l'écran fait passer de **Propriétaire** à **Agent de contrôle** puis **Administrateur DGTT**,
+et « Réinitialiser » remet la démonstration à zéro. Aucun e-mail, aucun mot de passe, aucune connexion Internet.
+
+- Télécharger : onglet Actions → « Construire la présentation » → dernière exécution → Artifacts → `TransDoc-presentation`.
+- Scénario conseillé : le propriétaire inscrit un véhicule → l'agent le contrôle (« Pièces non vérifiées ») →
+  l'administrateur vérifie ses pièces dans le registre national → l'agent recontrôle (« Conforme »).
+- Sans l'exécutable : `node scripts/construire-presentation.js`, puis ouvrir `presentation/app/index.html` dans un navigateur.
+
+Le registre simulé (`presentation/registre-local.js`) reproduit les règles des migrations ; il garde les données sur l'ordinateur.
 
 ## Développement
 
