@@ -9,5 +9,6 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8"
-  }
+  },
+  "author": "YOLLA ANGO Fred Darrel"
 }

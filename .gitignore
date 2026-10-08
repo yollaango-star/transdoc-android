@@ -1,3 +1,6 @@
 node_modules/
 supabase/.temp/
 supabase/.branches/
+presentation/app/
+presentation/dist/
+presentation/node_modules/
